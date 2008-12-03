@@ -99,7 +99,7 @@ class JavaScriptLexer(object):
 				m = self.sx.match(t + self.s)
 				if m:
 					l = m.end() - len(t)
-					self.c = self.s[:l]
+					self.c = t + self.s[:l]
 					self.offset += l
 					self.s = self.s[l:]
 					return self.it('(string)', self.c)
@@ -129,7 +129,7 @@ class JavaScriptLexer(object):
 				m = self.rx.match(t + self.s)
 				if m:
 					l = m.end() - len(t)
-					self.c = self.s[:l]
+					self.c = t + self.s[:l]
 					self.offset += l
 					self.s = self.s[l:]
 					return self.it('(regexp)', self.c)

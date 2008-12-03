@@ -36,7 +36,7 @@ class Symbol(object):
 			"Expected an identifier and instead saw '%s'." % token.id, token)
 
 	def __repr__(self):
-		if self.id == '(identifier)':
+		if self.id in ('(identifier)', '(number)', '(string)'):
 			return "(%s %s)" % (self.id[1:-1], self.value)
 		out = [self.id, self.first, self.second, self.third]
 		out = map(str, filter(None, out))
