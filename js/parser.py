@@ -309,11 +309,11 @@ def function(s):
 	s.name = optionalidentifier()
 	if s.name:
 		context.functions[s.name] = s
+	s.params = functionparams()
 	s.functions = {}
 	s.vars = set()
-	s.first = functionparams()
 	c, context = context, s
-	s.second = block()
+	s.first = block()
 	context = c
 
 @method(stmt('function'))
@@ -624,7 +624,7 @@ def parse_file(filename):
 	lexer = JavaScriptLexer(open(filename, 'r').read(), symbol_table, filename)
 	
 	context = symbol_table['(global)']()
-	context.functions = []
+	context.functions = {}
 	context.vars = set()
 
 	advance()
