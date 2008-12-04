@@ -139,6 +139,7 @@ type('(regexp)', lambda self: self)
 symbol('(identifier)').nud = lambda self: self
 
 # special parse tokens
+symbol('(global)')
 symbol('(endline)'); symbol('(begin)'); symbol('(end)').reach = True
 symbol('(error)').reach = True
 
@@ -266,6 +267,7 @@ def varstatement(prefix=False):
 	vars = []
 	while 1:
 		var = identifier()
+		context.vars.add(var.value)
 		if prefix:
 			return [var]
 		if nexttoken.id == '=':
@@ -302,11 +304,21 @@ def functionparams():
 	advance(')', t)
 	return p
 
+def function(s):
+	global context
+	s.name = optionalidentifier()
+	if s.name:
+		context.functions[s.name] = s
+	s.functions = {}
+	s.vars = set()
+	s.first = functionparams()
+	c, context = context, s
+	s.second = block()
+	context = c
+
 @method(stmt('function'))
 def fud(self):
-	self.name = optionalidentifier()
-	self.first = functionparams()
-	self.second = block()
+	function(self)
 	if nexttoken.id == '(' and nexttoken.lineno == token.lineno:
 		raise JavaScriptSyntaxError(
 			"Function statements are not invocable. Wrap the function expression in parens.", self)
@@ -314,9 +326,7 @@ def fud(self):
 
 @method(prefix('function'))
 def nud(self):
-	self.name = optionalidentifier()
-	self.first = functionparams()
-	self.second = block()
+	function(self)
 	return self
 
 @method(stmt('if'))
@@ -610,12 +620,16 @@ def identifier():
 
 
 def parse_file(filename):
-	global lexer
+	global lexer, context
 	lexer = JavaScriptLexer(open(filename, 'r').read(), symbol_table, filename)
 	
+	context = symbol_table['(global)']()
+	context.functions = []
+	context.vars = set()
+
 	advance()
-	s = statements()
+	context.first = statements()
 	advance('(end)')
 
-	return s
+	return context
 
