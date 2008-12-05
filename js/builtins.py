@@ -1,4 +1,6 @@
 
+null = object()
+
 
 class Property(object):
 	read_only = False
@@ -21,7 +23,14 @@ class BaseObject(object):
 			return self.properties[key].value
 		if not self.prototype:
 			return None
-		return self.prototype.get(key).value
+		return self.prototype[key]
+
+	def get(self, key):
+		if key in self.properties:
+			return self.properties[key]
+		if not self.prototype:
+			return None
+		return self.prototype.get(key)
 	
 	def __setitem__(self, key, value): # [[Put]]
 		if not self.can_put(key):
@@ -55,6 +64,13 @@ class BaseObject(object):
 		# TODO
 		return None
 
+	def __str__(self):
+		return '[object %s]' % self.name
+
+
+#####################################################################
+# native objects
+#####################################################################
 
 class JavaScriptObject(BaseObject):
 	name = 'Object'
@@ -62,33 +78,42 @@ class JavaScriptObject(BaseObject):
 
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
+	prototype = JavaScriptObject()
+	symbol = None
 
 class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
+	prototype = JavaScriptObject()
 
 class JavaScriptString(JavaScriptObject):
 	name = 'String'
+	prototype = JavaScriptObject()
 	def __init__(self, value=''):
 		self.value = value
 
 class JavaScriptBoolean(JavaScriptObject):
 	name = 'Boolean'
+	prototype = JavaScriptObject()
 	def __init__(self, value=False):
 		self.value = value
 
 class JavaScriptNumber(JavaScriptObject):
 	name = 'Number'
+	prototype = JavaScriptObject()
 	def __init__(self, value=0.0):
 		self.value = value
 
 class JavaScriptMath(JavaScriptObject):
 	name = 'Math'
+	prototype = JavaScriptObject()
 
 class JavaScriptDate(JavaScriptObject):
 	name = 'Date'
+	prototype = JavaScriptObject()
 
 class JavaScriptRegExp(JavaScriptObject):
 	name = 'RegExp'
+	prototype = JavaScriptObject()
 
 
 #####################################################################
@@ -96,24 +121,33 @@ class JavaScriptRegExp(JavaScriptObject):
 #####################################################################
 
 class JavaScriptError(JavaScriptObject):
-	pass
+	name = 'Error'
+	prototype = JavaScriptObject()
+	def __str__(self):
+		return '%s: %s' % (self.name, toString(self['message']))
 
-class JavaScriptEvalError(JavaScriptObject):
-	pass
+class JavaScriptEvalError(JavaScriptError):
+	name = 'EvalError'
+	prototype = JavaScriptError()
 
-class JavaScriptRangeError(JavaScriptObject):
-	pass
+class JavaScriptRangeError(JavaScriptError):
+	name = 'RangeError'
+	prototype = JavaScriptError()
 
-class JavaScriptReferenceError(JavaScriptObject):
-	pass
+class JavaScriptReferenceError(JavaScriptError):
+	name = 'ReferenceError'
+	prototype = JavaScriptError()
 
-class JavaScriptSyntaxError(JavaScriptObject):
-	pass
+class JavaScriptSyntaxError(JavaScriptError):
+	name = 'SyntaxError'
+	prototype = JavaScriptError()
 
-class JavaScriptTypeError(JavaScriptObject):
-	pass
+class JavaScriptTypeError(JavaScriptError):
+	name = 'TypeError'
+	prototype = JavaScriptError()
 
-class JavaScriptURIError(JavaScriptObject):
-	pass
+class JavaScriptURIError(JavaScriptError):
+	name = 'URIError'
+	prototype = JavaScriptError()
 
 

@@ -135,8 +135,12 @@ symbol_table = {}
 type('(number)', lambda self: self)
 type('(string)', lambda self: self)
 type('(regexp)', lambda self: self)
+type('(array)')
+type('(object)')
 
 symbol('(identifier)').nud = lambda self: self
+
+symbol('(statements)'); symbol('(statement)')
 
 # special parse tokens
 symbol('(global)')
@@ -204,6 +208,7 @@ def led(self, left):
 	self.second = identifier()
 	return self
 
+
 @method(infix('(', 155))
 def led(self, left):
 	self.first = left
@@ -221,6 +226,7 @@ def nud(self):
 	advance(')', self)
 	return v
 
+
 @method(infix('[', 160))
 def led(self, left):
 	self.first = left
@@ -230,17 +236,26 @@ def led(self, left):
 
 @method(prefix('['))
 def nud(self):
-	self.first = []
+	s = symbol_table['(array)']()
+	s.first = []
 	while nexttoken.id != ']':
 		self.first.append(parse(10))
 		if nexttoken.id == ',':
 			advance(',')
-	advance(']', self)
+	advance(']', s)
+	return s
+
+
+@method(symbol('{'))
+def fud(self):
+	self.first = block()
+	advance('}', self)
 	return self
 
 @method(symbol('{'))
 def nud(self):
-	self.first = []
+	s = symbol_table['(object)']()
+	s.first = []
 	while nexttoken.id != '}':
 		key = optionalidentifier()
 		if not key:
@@ -251,16 +266,11 @@ def nud(self):
 				raise JavaScriptSyntaxError(
 					"Expected '}' and instead saw '%s'." % nexttoken.value, nexttoken)
 		advance(':')
-		self.first.append((key, parse(10)))
+		s.first.append((key, parse(10)))
 		if nexttoken.id == ',':
 			advance(',')
 	advance('}', self)
-	return self
-
-@method(symbol('{'))
-def fud(self):
-	raise JavaScriptSyntaxError(
-		"Expected to see a statement and instead saw a block.", token)
+	return s
 
 
 def varstatement(prefix=False):
@@ -304,10 +314,10 @@ def functionparams():
 	advance(')', t)
 	return p
 
-def function(s):
+def function(s, is_decl):
 	global context
 	s.name = optionalidentifier()
-	if s.name:
+	if is_decl and s.name:
 		context.functions[s.name] = s
 	s.params = functionparams()
 	s.functions = {}
@@ -318,7 +328,7 @@ def function(s):
 
 @method(stmt('function'))
 def fud(self):
-	function(self)
+	function(self, False)
 	if nexttoken.id == '(' and nexttoken.lineno == token.lineno:
 		raise JavaScriptSyntaxError(
 			"Function statements are not invocable. Wrap the function expression in parens.", self)
@@ -488,6 +498,8 @@ def nud(self):
 
 @method(stmt('return'))
 def nud(self):
+	if context.id == '(global)':
+		raise JavaScriptSyntaxError("return declared in the global scope.", token)
 	if nexttoken.id != ';' and not nexttoken.reach:
 		self.first = parse(20)
 	#reachable('return')
@@ -575,15 +587,16 @@ def statement():
 	if t.id == ';': # empty
 		advance(';')
 		return
+	s = symbol_table['(statement)']()
 	# Is this a labelled statement?
 	if t.identifier and not t.reserved and peek().id == ':':
 		advance()
 		advance(':')
 		t = nexttoken
-	r = parse(0, True)
+	s.first = parse(0, True)
 	if nexttoken.id == ';':
 		advance(';')
-	return r
+	return s
 
 def statements():
 	statements = []
@@ -601,7 +614,7 @@ def block(f=False):
 			s = statements()
 		advance('}', t)
 	else:
-		s = [statement()]
+		s = statements()
 	return s
 
 def optionalidentifier():
