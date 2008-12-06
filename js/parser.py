@@ -307,16 +307,17 @@ def functionparams():
 	p = []
 	advance('(')
 	while nexttoken.id != ')':
-		i = identifier()
-		p.append(i)
+		p.append(identifier().value)
 		if nexttoken.id == ',':
 			advance(',')
 	advance(')', t)
 	return p
 
-def function(s, is_decl):
+def function(s, is_decl=True):
 	global context
-	s.name = optionalidentifier()
+	s.is_decl = is_decl
+	i = optionalidentifier()
+	s.name = i and i.value or None
 	if is_decl and s.name:
 		context.functions[s.name] = s
 	s.params = functionparams()
@@ -328,7 +329,7 @@ def function(s, is_decl):
 
 @method(stmt('function'))
 def fud(self):
-	function(self, False)
+	function(self)
 	if nexttoken.id == '(' and nexttoken.lineno == token.lineno:
 		raise JavaScriptSyntaxError(
 			"Function statements are not invocable. Wrap the function expression in parens.", self)
@@ -336,7 +337,7 @@ def fud(self):
 
 @method(prefix('function'))
 def nud(self):
-	function(self)
+	function(self, False)
 	return self
 
 @method(stmt('if'))
