@@ -1,6 +1,5 @@
 
-from builtins import *
-
+null = object()
 
 def typeof(value):
 	if value is None:
@@ -110,6 +109,199 @@ class ExecutionContext(object):
 				variables.put(name, None, dont_delete=True)
 
 
+class Property(object):
+	read_only = False
+	dont_enum = False
+	dont_delete = False
+	internal = False
+	def __init__(self, value, read_only=False, dont_enum=False, dont_delete=False):
+		self.value = value
+		if read_only: self.read_only = True
+		if dont_enum: self.dont_enum = True
+		if dont_delete: self.dont_delete = True
+
+
+class BaseObject(object):
+	name = None # [[Class]]
+	prototype = None # [[Prototype]]
+
+	def __init__(self):
+		self.properties = {}
+
+	def __getitem__(self, key): # [[Get]]
+		if key in self.properties:
+			return self.properties[key].value
+		if not self.prototype:
+			return None
+		return self.prototype[key]
+
+	def get(self, key):
+		if key in self.properties:
+			return self.properties[key]
+		if not self.prototype:
+			return None
+		return self.prototype.get(key)
+
+	def __setitem__(self, key, value): # [[Put]]
+		if not self.can_put(key):
+			return False
+		if key in self.properties:
+			self.properties[key].value = value
+		self.properties[key] = Property(value)
+		return value
+
+	def put(self, key, value, read_only=False, dont_enum=False, dont_delete=False):
+		if key in self.properties:
+			prop = self.properties[key]
+			prop.value = value
+			prop.read_only = read_only
+			prop.dont_enum = dont_enum
+			prop.dont_delete = dont_delete
+		else:
+			self.properties[key] = Property(value, read_only, dont_enum, dont_delete)
+		return value
+
+	def __delitem__(self, key): # [[Delete]]
+		if key not in self.properties:
+			return True
+		if self.variables[key].dont_delete:
+			return False
+		del self.variables[key]
+		return True
+
+	def __contains__(self, key): # [[HasProperty]]
+		return (key in self.properties) or self.prototype and (key in self.prototoype)
+
+	def can_put(self, key): # [[CanPut]]
+		if key in self.properties:
+			return not self.properties[key].read_only
+		if self.prototype:
+			return self.prototype.can_put(key)
+		return True
+
+	def default_value(self, hint=None): # [[DefaultValue]]
+		to_string = self['toString']
+		value_of = self['valueOf']
+		# TODO
+		return None
+
+	def __str__(self):
+		return '[object %s]' % self.name
+
+
+## Native Objects
+
+class JavaScriptObject(BaseObject):
+	name = 'Object'
+	prototype = BaseObject()
+
+class JavaScriptFunction(JavaScriptObject):
+	name = 'Function'
+	prototype = JavaScriptObject()
+	def __init__(self, s, scope):
+		JavaScriptObject.__init__(self)
+
+		self.symbol = s
+		self.scope = scope
+
+		self.put('length', len(s.params), True, True, True)
+		self.put('prototype', JavaScriptObject(), dont_delete=True)
+		self['prototype'].put('constructor', self, dont_enum=True)
+
+	def call(self, this, args, context):
+		c = ExecutionContext(self.symbol, this, self.scope, context, args)
+		v = execute(self.symbol.first, c)
+		if v[0] == 'throw':
+			raise v[1]
+		if v[0] == 'return':
+			return v[1]
+		else: # normal
+			return None
+
+	def construct(self, args, context):
+		o = JavaScriptObject()
+		if isinstance(self['prototype'], BaseObject):
+			o.prototype = self['prototype']
+		v = self.call(o, args, context)
+		if typeof(v) == 'object':
+			return v
+		return o
+
+class JavaScriptArray(JavaScriptObject):
+	name = 'Array'
+	prototype = JavaScriptObject()
+
+class JavaScriptString(JavaScriptObject):
+	name = 'String'
+	prototype = JavaScriptObject()
+	def __init__(self, value=''):
+		self.value = value
+
+	@classmethod
+	def call(self, this, args, c):
+		pass
+
+class JavaScriptBoolean(JavaScriptObject):
+	name = 'Boolean'
+	prototype = JavaScriptObject()
+	def __init__(self, value=False):
+		self.value = value
+
+class JavaScriptNumber(JavaScriptObject):
+	name = 'Number'
+	prototype = JavaScriptObject()
+	def __init__(self, value=0.0):
+		self.value = value
+
+class JavaScriptMath(JavaScriptObject):
+	name = 'Math'
+	prototype = JavaScriptObject()
+
+class JavaScriptDate(JavaScriptObject):
+	name = 'Date'
+	prototype = JavaScriptObject()
+
+class JavaScriptRegExp(JavaScriptObject):
+	name = 'RegExp'
+	prototype = JavaScriptObject()
+
+
+## Errors
+
+class JavaScriptError(JavaScriptObject):
+	name = 'Error'
+	prototype = JavaScriptObject()
+	def __str__(self):
+		return '%s: %s' % (self.name, toString(self['message']))
+
+class JavaScriptEvalError(JavaScriptError):
+	name = 'EvalError'
+	prototype = JavaScriptError()
+
+class JavaScriptRangeError(JavaScriptError):
+	name = 'RangeError'
+	prototype = JavaScriptError()
+
+class JavaScriptReferenceError(JavaScriptError):
+	name = 'ReferenceError'
+	prototype = JavaScriptError()
+
+class JavaScriptSyntaxError(JavaScriptError):
+	name = 'SyntaxError'
+	prototype = JavaScriptError()
+
+class JavaScriptTypeError(JavaScriptError):
+	name = 'TypeError'
+	prototype = JavaScriptError()
+
+class JavaScriptURIError(JavaScriptError):
+	name = 'URIError'
+	prototype = JavaScriptError()
+
+
+
+## Execute
+
 def execute(s, c):
 	"executes symbol `s` in context `c`"
 
@@ -183,38 +375,36 @@ def execute(s, c):
 		return Reference(toObject(l), toString(r))
 
 	elif s.id == 'new':
-		l = getValue(execute(s.first.first, c))
-		if typeof(l) != 'object':
+		l = getValue(execute(s.first, c))
+		if typeof(l) != 'object' or not hasattr(l, 'construct'):
 			raise JavaScriptTypeError()
-		# TODO
+		if hasattr(s, 'params'):
+			args = [getValue(execute(arg, c)) for arg in s.params]
+		else:
+			args = []
+		return l.construct(args, c)
 
 	elif s.id == '(':
 		o = execute(s.first, c)
-		args = [getValue(execute(arg, c)) for arg in s.second]
+		args = [getValue(execute(arg, c)) for arg in s.params]
 		f = getValue(o)
-		if typeof(f) != 'object':
+		if typeof(f) != 'object' or not hasattr(f, 'call'):
 			raise JavaScriptTypeError()
 		if isinstance(o, Reference):
 			this = o.base
 			# TODO check for Activation object?
 		else:
 			this = null
-		v = execute(f.symbol.first,
-			ExecutionContext(f.symbol, this, f.scope, c, args))
-		if v[0] == 'throw':
-			raise v[1]
-		if v[0] == 'return':
-			return v[1]
-		else: # normal
-			return None
+		return f.call(this, args, c)
 
 	elif s.id == 'typeof':
 		l = execute(s.first, c)
 		if isinstance(l, Reference) and l.base == None:
 			return 'undefined'
-		type = typeof(getValue(l))
-		if type == 'object':
-			pass # TODO check for functions
+		o = getValue(l)
+		type = typeof(o)
+		if type == 'object' and hasattr(o, 'call'):
+			return 'function'
 		return type
 
 	elif s.id == '!':

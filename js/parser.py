@@ -197,6 +197,11 @@ prefix('delete', 0)
 
 prefix('~'); prefix('!'); prefix('typeof')
 
+@method(stmt('new'))
+def fud(self):
+	self.first = parse(155)
+	return self
+
 @method(prefix('new', 155))
 def nud(self):
 	self.first = parse(155)
@@ -211,14 +216,18 @@ def led(self, left):
 
 @method(infix('(', 155))
 def led(self, left):
-	self.first = left
-	self.second = []
+	if left.id == 'new':
+		s = left
+	else:
+		s = self
+		self.first = left
+	s.params = []
 	while nexttoken.id != ')':
-		self.second.append(parse(10))
+		s.params.append(parse(10))
 		if nexttoken.id == ',':
 			advance(',')
 	advance(')')
-	return self
+	return s
 
 @method(prefix('('))
 def nud(self):
@@ -297,10 +306,6 @@ def varstatement(prefix=False):
 def nud(self):
 	self.first = varstatement()
 	return self
-
-@method(stmt('new'))
-def fud(self):
-	raise JavaScriptSyntaxError("'new' should not be used as a statement.", self)
 
 def functionparams():
 	t = nexttoken
@@ -608,11 +613,9 @@ def statements():
 
 def block(f=False):
 	t = nexttoken
-	s = None
 	if nexttoken.id == '{':
 		advance('{')
-		if nexttoken.id != '}' or token.lineno != nexttoken.lineno:
-			s = statements()
+		s = statements()
 		advance('}', t)
 	else:
 		s = statements()
