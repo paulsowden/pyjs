@@ -195,6 +195,14 @@ class JavaScriptObject(BaseObject):
 	name = 'Object'
 	prototype = BaseObject()
 
+	@classmethod
+	def call(self, this, args, c):
+		if len(args) == 0:
+			o = JavaScriptObject()
+		else:
+			o = args[0]
+		return toObject(o)
+
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
 	prototype = JavaScriptObject()
@@ -239,7 +247,11 @@ class JavaScriptString(JavaScriptObject):
 
 	@classmethod
 	def call(self, this, args, c):
-		pass
+		if len(args) == 0:
+			s = ''
+		else:
+			s = args[0]
+		return toString(s)
 
 class JavaScriptBoolean(JavaScriptObject):
 	name = 'Boolean'
@@ -298,6 +310,17 @@ class JavaScriptURIError(JavaScriptError):
 	name = 'URIError'
 	prototype = JavaScriptError()
 
+
+## Global Scope
+
+def global_scope():
+	global_scope = Scope()
+	s = global_scope.object
+
+	s['Object'] = JavaScriptObject
+	s['String'] = JavaScriptString
+
+	return global_scope
 
 
 ## Execute
@@ -508,7 +531,7 @@ def execute(s, c):
 
 def run(context):
 	v = None
-	c = ExecutionContext(context)
+	c = ExecutionContext(context, scope=global_scope())
 
 	for s in context.first:
 		v = execute(s, c)
