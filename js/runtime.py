@@ -62,6 +62,8 @@ class Reference(object):
 	def __init__(self, base, property_name):
 		self.base = base
 		self.property_name = property_name
+	def __repr__(self):
+		return '<Reference %s %s>' % (self.base, self.property_name)
 
 def getValue(v):
 	if isinstance(v, Reference):
@@ -87,26 +89,31 @@ class Scope(object):
 
 class ExecutionContext(object):
 
-	def __init__(self, context, top=None, this=None, scope=None, parent_scope=None):
-		self.scope = scope or Scope(parent_scope)
-		self.top = top or self
+	def __init__(self, context, this=None, scope=None, parent_context=None, args=None):
+		self.scope = scope or Scope()
+		self.top = parent_context and parent_context.top or self
 		self.this = this or self.top.scope.object
 
 		variables = self.scope.object
 		if hasattr(context, 'params'):
-			pass # add the arguments to the variables
-		for name, function in context.functions.values():
-			variables[name] = function
-			variables.get(name).dont_delete = True
+			for i in range(len(context.params)):
+				name = context.params[i]
+				if len(args) > i:
+					variables[name] = args[i]
+				else:
+					variables[name] = None
+				variables.get(name).dont_delete = True
+		for name, function in context.functions.items():
+			variables.put(name, execute(function, self), dont_delete=True)
 		for name in context.vars:
 			if name not in variables:
-				variables[name] = None
-				variables.get(name).dont_delete = True
+				variables.put(name, None, dont_delete=True)
 
 
 def execute(s, c):
 	"executes symbol `s` in context `c`"
 
+	#print s
 	if isinstance(s, list) or s.id == '{': # block statement
 		if not isinstance(s, list):
 			s = s.first
@@ -180,6 +187,26 @@ def execute(s, c):
 		if typeof(l) != 'object':
 			raise JavaScriptTypeError()
 		# TODO
+
+	elif s.id == '(':
+		o = execute(s.first, c)
+		args = [getValue(execute(arg, c)) for arg in s.second]
+		f = getValue(o)
+		if typeof(f) != 'object':
+			raise JavaScriptTypeError()
+		if isinstance(o, Reference):
+			this = o.base
+			# TODO check for Activation object?
+		else:
+			this = null
+		v = execute(f.symbol.first,
+			ExecutionContext(f.symbol, this, f.scope, c, args))
+		if v[0] == 'throw':
+			raise v[1]
+		if v[0] == 'return':
+			return v[1]
+		else: # normal
+			return None
 
 	elif s.id == 'typeof':
 		l = execute(s.first, c)
@@ -278,20 +305,12 @@ def execute(s, c):
 	elif s.id == 'try':
 		pass
 	elif s.id == 'function':
-		f = JavaScriptFunction()
-
-		f['length'] = len(s.params)
-		f.get('length').dont_delete = True
-		f.get('length').read_only = True
-		f.get('length').dont_enum = True
-
-		f['prototype'] = JavaScriptObject()
-		f.get('prototype').dont_delete = True
-
-		f['prototype']['constructor'] = f
-		f['prototype'].get('constructor').dont_enum = True
-
-		f.symbol = s
+		if s.is_decl and s.name:
+			scope = Scope(c.scope)
+			f = JavaScriptFunction(s, scope)
+			scope.object.put(s.name, f, dont_delete=True, read_only=True)
+		else:
+			f = JavaScriptFunction(s, c.scope)
 		return f
 
 	raise RuntimeError, "unknown operation %s" % s.id

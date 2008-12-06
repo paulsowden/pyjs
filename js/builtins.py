@@ -7,8 +7,11 @@ class Property(object):
 	dont_enum = False
 	dont_delete = False
 	internal = False
-	def __init__(self, value):
+	def __init__(self, value, read_only=False, dont_enum=False, dont_delete=False):
 		self.value = value
+		if read_only: self.read_only = True
+		if dont_enum: self.dont_enum = True
+		if dont_delete: self.dont_delete = True
 
 
 class BaseObject(object):
@@ -38,6 +41,17 @@ class BaseObject(object):
 		if key in self.properties:
 			self.properties[key].value = value
 		self.properties[key] = Property(value)
+		return value
+
+	def put(self, key, value, read_only=False, dont_enum=False, dont_delete=False):
+		if key in self.properties:
+			prop = self.properties[key]
+			prop.value = value
+			prop.read_only = read_only
+			prop.dont_enum = dont_enum
+			prop.dont_delete = dont_delete
+		else:
+			self.properties[key] = Property(value, read_only, dont_enum, dont_delete)
 		return value
 
 	def __delitem__(self, key): # [[Delete]]
@@ -79,7 +93,15 @@ class JavaScriptObject(BaseObject):
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
 	prototype = JavaScriptObject()
-	symbol = None
+	def __init__(self, s, scope):
+		JavaScriptObject.__init__(self)
+
+		self.symbol = s
+		self.scope = scope
+
+		self.put('length', len(s.params), True, True, True)
+		self.put('prototype', JavaScriptObject(), dont_delete=True)
+		self['prototype'].put('constructor', self, dont_enum=True)
 
 class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
