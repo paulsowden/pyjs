@@ -43,7 +43,13 @@ def toString(value):
 		return str(value) # TODO
 	if type == 'object':
 		return toString(toPrimitive(value, 'string'))
-	return object
+	return type
+
+def toRepr(value):
+	type = typeof(value)
+	if type == 'string':
+		return '"%s"' % value
+	return toString(value)
 
 def toObject(value):
 	if value is None or value is null:
@@ -122,7 +128,7 @@ class Property(object):
 
 
 class BaseObject(object):
-	name = None # [[Class]]
+	name = 'Object' # [[Class]]
 	prototype = None # [[Prototype]]
 
 	def __init__(self):
@@ -181,27 +187,34 @@ class BaseObject(object):
 
 	def default_value(self, hint=None): # [[DefaultValue]]
 		to_string = self['toString']
+		if hasattr(to_string, 'call'):
+			return to_string.call(self, [], None)
 		value_of = self['valueOf']
 		# TODO
 		return None
 
-	def __str__(self):
-		return '[object %s]' % self.name
+
+class BuiltinFunction(BaseObject):
+	def __init__(self, fn):
+		BaseObject.__init__(self)
+		self.fn = fn
+	def call(self, this, args, c):
+		return self.fn(*[this, args, c])
+
+def proto(prototype, name): # decorator
+	def bind(fn):
+		prototype[name] = BuiltinFunction(fn)
+	return bind
 
 
 ## Native Objects
 
 class JavaScriptObject(BaseObject):
-	name = 'Object'
 	prototype = BaseObject()
 
-	@classmethod
-	def call(self, this, args, c):
-		if len(args) == 0:
-			o = JavaScriptObject()
-		else:
-			o = args[0]
-		return toObject(o)
+	@proto(prototype, 'toString')
+	def toString(this, args, c):
+		return '[object %s]' % this.name
 
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
@@ -243,15 +256,42 @@ class JavaScriptString(JavaScriptObject):
 	name = 'String'
 	prototype = JavaScriptObject()
 	def __init__(self, value=''):
+		JavaScriptObject.__init__(self)
 		self.value = value
 
-	@classmethod
-	def call(self, this, args, c):
-		if len(args) == 0:
-			s = ''
+	@proto(prototype, 'toString')
+	def toString(this, args, c):
+		if not isinstance(this, JavaScriptString):
+			raise JavaScriptTypeError()
+		return this.value
+
+	@proto(prototype, 'valueOf')
+	def valueOf(this, args, c):
+		if not isinstance(this, JavaScriptString):
+			raise JavaScriptTypeError()
+		return this.value
+
+	@proto(prototype, 'charAt')
+	def charAt(this, args, c):
+		s = toString(this)
+		n = len(args) and int(toNumber(args[0])) or 0
+		if n < 0 or n > len(s):
+			return ''
 		else:
-			s = args[0]
-		return toString(s)
+			return s[n]
+
+	@proto(prototype, 'charCodeAt')
+	def charCodeAt(this, args, c):
+		s = toString(this)
+		n = len(args) and int(toNumber(args[0])) or 0
+		if n < 0 or n > len(s):
+			return 0 # TODO return NaN
+		else:
+			return ord(s[n])
+
+	@proto(prototype, 'concat')
+	def concat(this, args, c):
+		return toString(this) + ''.join(toString(arg) for arg in args)
 
 class JavaScriptBoolean(JavaScriptObject):
 	name = 'Boolean'
@@ -264,10 +304,6 @@ class JavaScriptNumber(JavaScriptObject):
 	prototype = JavaScriptObject()
 	def __init__(self, value=0.0):
 		self.value = value
-
-class JavaScriptMath(JavaScriptObject):
-	name = 'Math'
-	prototype = JavaScriptObject()
 
 class JavaScriptDate(JavaScriptObject):
 	name = 'Date'
@@ -313,12 +349,47 @@ class JavaScriptURIError(JavaScriptError):
 
 ## Global Scope
 
+class BuiltinObject(BaseObject):
+	def __init__(self):
+		BaseObject.__init__(self)
+		self['prototype'] = JavaScriptObject.prototype
+		self['prototype']['constructor'] = self
+	def call(self, this, args, c):
+		if len(args) == 0:
+			o = JavaScriptObject()
+		else:
+			o = args[0]
+		return toObject(o)
+
+class BuiltinString(BaseObject):
+	def __init__(self):
+		BaseObject.__init__(self)
+		self['prototype'] = JavaScriptString.prototype
+		self['prototype']['constructor'] = self
+
+		@proto(self, 'fromCharCode')
+		def fromCharCode(this, args, c):
+			return ''.join(chr(int(toNumber(arg))) for arg in args)
+
+	def call(self, this, args, c):
+		if len(args) == 0:
+			s = ''
+		else:
+			s = args[0]
+		return toString(s)
+	def construct(self, args, c):
+		if len(args):
+			s = toString(args[0])
+		else:
+			s = ''
+		return JavaScriptString(s)
+
 def global_scope():
 	global_scope = Scope()
 	s = global_scope.object
 
-	s['Object'] = JavaScriptObject
-	s['String'] = JavaScriptString
+	s['Object'] = BuiltinObject()
+	s['String'] = BuiltinString()
 
 	return global_scope
 
@@ -529,12 +600,8 @@ def execute(s, c):
 	raise RuntimeError, "unknown operation %s" % s.id
 
 
-def run(context):
-	v = None
-	c = ExecutionContext(context, scope=global_scope())
-
-	for s in context.first:
-		v = execute(s, c)
-	return getValue(v[1])
+def run(symbol, scope=None):
+	c = ExecutionContext(symbol, scope=scope or global_scope())
+	return getValue(execute(symbol.first, c)[1])
 
 
