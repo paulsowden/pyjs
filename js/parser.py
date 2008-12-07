@@ -248,7 +248,7 @@ def nud(self):
 	s = symbol_table['(array)']()
 	s.first = []
 	while nexttoken.id != ']':
-		self.first.append(parse(10))
+		s.first.append(parse(10))
 		if nexttoken.id == ',':
 			advance(',')
 	advance(']', s)
@@ -635,10 +635,9 @@ def identifier():
 	return i
 
 
-
-def parse_file(filename):
+def parse_str(js, filename=""):
 	global lexer, context
-	lexer = JavaScriptLexer(open(filename, 'r').read(), symbol_table, filename)
+	lexer = JavaScriptLexer(js, symbol_table, filename)
 	
 	context = symbol_table['(global)']()
 	context.functions = {}
@@ -649,4 +648,8 @@ def parse_file(filename):
 	advance('(end)')
 
 	return context
+
+def parse_file(filename):
+	return parse(open(filename, 'r').read(), filename)
+
 
