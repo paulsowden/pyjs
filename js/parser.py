@@ -77,6 +77,7 @@ def prefix(id, bp=150):
 	s = symbol(id)
 	def nud(self):
 		self.first = parse(bp)
+		self.arity = 'unary'
 		return self
 	s.nud = nud
 	return s
@@ -196,11 +197,6 @@ suffix('--'); prefix('--')
 prefix('delete', 0)
 
 prefix('~'); prefix('!'); prefix('typeof')
-
-@method(stmt('new'))
-def fud(self):
-	self.first = parse(155)
-	return self
 
 @method(prefix('new', 155))
 def nud(self):
@@ -650,6 +646,7 @@ def parse_str(js, filename=""):
 	return context
 
 def parse_file(filename):
-	return parse(open(filename, 'r').read(), filename)
+	return parse_str(open(filename, 'r').read(), filename)
+
 
 
