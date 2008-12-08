@@ -18,6 +18,8 @@ def toPrimitive(value, preferred=None):
 	if value is null or value is None or isinstance(value, float) \
 			or isinstance(value, str) or isinstance(value, bool):
 		return value
+	if isinstance(value, int):
+		return float(value)
 	return value.default_value(preferred)
 
 def toBoolean(value):
@@ -61,6 +63,25 @@ def toObject(value):
 	if isinstance(value, str):
 		return JavaScriptString(value)
 	return value
+
+def lessThan(x, y):
+	x, y = toPrimitive(x, 'number'), toPrimitive(y, 'number')
+	if typeof(x) != 'string' or typeof(y) != 'string':
+		x, y = toNumber(x), toNumber(y)
+		if x == y:
+			return False
+		# TODO NaN, Infinity checks
+		return x < y
+	# string comparison
+	if x.startswith(y):
+		return False
+	if y.startswith(x):
+		return True
+	for i in range(len(x)):
+		if ord(x[i]) < ord(y[i]):
+			return True
+		elif ord(x[i]) > ord(y[i]):
+			return False
 
 
 class Reference(object):
@@ -170,13 +191,13 @@ class BaseObject(object):
 	def __delitem__(self, key): # [[Delete]]
 		if key not in self.properties:
 			return True
-		if self.variables[key].dont_delete:
+		if self.properties[key].dont_delete:
 			return False
-		del self.variables[key]
+		del self.properties[key]
 		return True
 
 	def __contains__(self, key): # [[HasProperty]]
-		return (key in self.properties) or self.prototype and (key in self.prototoype)
+		return (key in self.properties) or self.prototype and (key in self.prototype)
 
 	def can_put(self, key): # [[CanPut]]
 		if key in self.properties:
@@ -225,7 +246,7 @@ class JavaScriptFunction(JavaScriptObject):
 		self.symbol = s
 		self.scope = scope
 
-		self.put('length', len(s.params), True, True, True)
+		self.put('length', float(len(s.params)), True, True, True)
 		self.put('prototype', JavaScriptObject(), dont_delete=True)
 		self['prototype'].put('constructor', self, dont_enum=True)
 
@@ -248,6 +269,18 @@ class JavaScriptFunction(JavaScriptObject):
 			return v
 		return o
 
+	def has_instance(self, v):
+		if not isinstance(v, JavaScriptObject):
+			return False
+		o = self['prototype']
+		if not isinstance(o, JavaScriptObject):
+			raise JavaScriptTypeError()
+		while hasattr(v, 'prototype'):
+			v = v.prototype
+			if o == v:
+				return True
+		return False
+
 class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
 	prototype = JavaScriptObject()
@@ -258,6 +291,7 @@ class JavaScriptString(JavaScriptObject):
 	def __init__(self, value=''):
 		JavaScriptObject.__init__(self)
 		self.value = value
+		self.put('length', float(len(value)), True, True, True)
 
 	@proto(prototype, 'toString')
 	def toString(this, args, c):
@@ -287,17 +321,53 @@ class JavaScriptString(JavaScriptObject):
 		if n < 0 or n > len(s):
 			return 0 # TODO return NaN
 		else:
-			return ord(s[n])
+			return float(ord(s[n]))
 
 	@proto(prototype, 'concat')
 	def concat(this, args, c):
 		return toString(this) + ''.join(toString(arg) for arg in args)
 
+	@proto(prototype, 'slice')
+	def concat(this, args, c):
+		s = toString(this)
+		n1 = len(args) and int(toNumber(args[0])) or 0
+		if n1 < 0:
+			n1 = max(n1+len(s), 0)
+		else:
+			n1 = min(len(s), n1)
+		n2 = len(args) > 1 and int(toNumber(args[1])) or 0
+		if n2 < 0:
+			n2 = max(n2+len(s), 0)
+		else:
+			n2 = min(len(s), n2)
+		return s[n1:n1+max(n2-n1,0)]
+
+	@proto(prototype, 'toLowerCase')
+	def toLowerCase(this, args, c):
+		return toString(this).lower()
+
+	@proto(prototype, 'toUpperCase')
+	def toLowerCase(this, args, c):
+		return toString(this).upper()
+
 class JavaScriptBoolean(JavaScriptObject):
 	name = 'Boolean'
 	prototype = JavaScriptObject()
 	def __init__(self, value=False):
+		JavaScriptObject.__init__(self)
 		self.value = value
+
+	@proto(prototype, 'toString')
+	def toString(this, args, c):
+		if not isinstance(this, JavaScriptBoolean):
+			raise JavaScriptTypeError()
+		return toString(this.value)
+
+	@proto(prototype, 'valueOf')
+	def valueOf(this, args, c):
+		if not isinstance(this, JavaScriptBoolean):
+			raise JavaScriptTypeError()
+		return this.value
 
 class JavaScriptNumber(JavaScriptObject):
 	name = 'Number'
@@ -349,10 +419,10 @@ class JavaScriptURIError(JavaScriptError):
 
 ## Global Scope
 
-class BuiltinObject(BaseObject):
+class BuiltinObject(JavaScriptFunction):
 	def __init__(self):
 		BaseObject.__init__(self)
-		self['prototype'] = JavaScriptObject.prototype
+		self.put('prototype', JavaScriptObject.prototype, True, True, True)
 		self['prototype']['constructor'] = self
 	def call(self, this, args, c):
 		if len(args) == 0:
@@ -361,10 +431,10 @@ class BuiltinObject(BaseObject):
 			o = args[0]
 		return toObject(o)
 
-class BuiltinString(BaseObject):
+class BuiltinString(JavaScriptFunction):
 	def __init__(self):
 		BaseObject.__init__(self)
-		self['prototype'] = JavaScriptString.prototype
+		self.put('prototype', JavaScriptString.prototype, True, True, True)
 		self['prototype']['constructor'] = self
 
 		@proto(self, 'fromCharCode')
@@ -384,12 +454,31 @@ class BuiltinString(BaseObject):
 			s = ''
 		return JavaScriptString(s)
 
+class BuiltinBoolean(JavaScriptFunction):
+	def __init__(self):
+		BaseObject.__init__(self)
+		self.put('prototype', JavaScriptBoolean.prototype, True, True, True)
+		self['prototype']['constructor'] = self
+	def call(self, this, args, c):
+		if len(args):
+			b = toBoolean(args[0])
+		else:
+			b = False
+		return b
+	def construct(self, args, c):
+		if len(args):
+			b = toBoolean(args[0])
+		else:
+			b = False
+		return JavaScriptBoolean(b)
+
 def global_scope():
 	global_scope = Scope()
 	s = global_scope.object
 
 	s['Object'] = BuiltinObject()
 	s['String'] = BuiltinString()
+	s['Boolean'] = BuiltinBoolean()
 
 	return global_scope
 
@@ -491,6 +580,7 @@ def execute(s, c):
 			this = null
 		return f.call(this, args, c)
 
+	## Unary Operators
 	elif s.id == 'typeof':
 		l = execute(s.first, c)
 		if isinstance(l, Reference) and l.base == None:
@@ -500,7 +590,20 @@ def execute(s, c):
 		if type == 'object' and hasattr(o, 'call'):
 			return 'function'
 		return type
-
+	elif s.id == 'void':
+		l = getValue(execute(s.first, c))
+		return None
+	elif s.id == 'delete':
+		l = execute(s.first, c)
+		if not isinstance(l, Reference):
+			return True
+		return l.base.__delitem__(l.property_name)
+	elif s.id == '+' and hasattr(s, 'arity'): # unary
+		return toNumber(getValue(execute(s.first, c)))
+	elif s.id == '-' and hasattr(s, 'arity'): # unary
+		return -toNumber(getValue(execute(s.first, c)))
+	elif s.id == '~':
+		pass
 	elif s.id == '!':
 		return not toBoolean(getValue(execute(s.first, c)))
 
@@ -510,26 +613,74 @@ def execute(s, c):
 		putValue(l, r, c)
 		return r
 
+	## Multiplicative Operators
 	elif s.id == '/':
-		return getValue(execute(s.first, c)) / getValue(execute(s.second, c))
+		return toNumber(getValue(execute(s.first, c))) / toNumber(getValue(execute(s.second, c)))
 	elif s.id == '*':
-		return getValue(execute(s.first, c)) * getValue(execute(s.second, c))
+		return toNumber(getValue(execute(s.first, c))) * toNumber(getValue(execute(s.second, c)))
+	elif s.id == '%':
+		return toNumber(getValue(execute(s.first, c))) % toNumber(getValue(execute(s.second, c)))
+
+	## Additive Operators
 	elif s.id == '+':
 		return getValue(execute(s.first, c)) + getValue(execute(s.second, c))
 	elif s.id == '-':
 		return getValue(execute(s.first, c)) - getValue(execute(s.second, c))
-	elif s.id == '%':
-		return getValue(execute(s.first, c)) % getValue(execute(s.second, c))
 
+	## Relational Operators
+	elif s.id == '<':
+		r = lessThan(getValue(execute(s.first, c)), getValue(execute(s.second, c)))
+		if r == None:
+			return False
+		return r
+	elif s.id == '>':
+		r = lessThan(getValue(execute(s.second, c)), getValue(execute(s.first, c)))
+		if r == None:
+			return False
+		return r
+	elif s.id == '<=':
+		r = lessThan(getValue(execute(s.second, c)), getValue(execute(s.first, c)))
+		if r == None:
+			return False
+		return not r
+	elif s.id == '>=':
+		r = lessThan(getValue(execute(s.first, c)), getValue(execute(s.second, c)))
+		if r == None:
+			return False
+		return not r
+	elif s.id == 'instanceof':
+		l = getValue(execute(s.first, c))
+		r = getValue(execute(s.second, c))
+		if not isinstance(r, BaseObject):
+			raise JavaScriptTypeError()
+		if not hasattr(r, 'has_instance'):
+			raise JavaScriptTypeError()
+		return r.has_instance(l)
+	elif s.id == 'in':
+		l = getValue(execute(s.first, c))
+		r = getValue(execute(s.second, c))
+		if not isinstance(r, BaseObject):
+			raise JavaScriptTypeError()
+		return toString(l) in r
+
+	## Equality Operators
+	elif s.id == '==':
+		pass
+	elif s.id == '!=':
+		pass
+	elif s.id == '===':
+		pass
+	elif s.id == '!==':
+		pass
 
 	## Statements
-	if s.id == '(statement)':
+	elif s.id == '(statement)':
 		v = execute(s.first, c)
 		if isinstance(v, tuple):
 			return v
 		else:
 			return ('normal', v, None)
-	if s.id == 'var':
+	elif s.id == 'var':
 		for var in s.first:
 			if var.id == '(identifier)': continue
 			execute(var, c) # assignment
