@@ -32,6 +32,7 @@ class JavaScriptLexer(object):
 		self.offset = 0
 		self.s = None
 		self.prereg = True
+		self.comment = None
 
 		self.nextLine()
 		self.start = 0
@@ -64,6 +65,8 @@ class JavaScriptLexer(object):
 		i = t.id
 		if i != '(endline)':
 			self.prereg = i and (i[-1] in '(,=:[!&|?{};' or i == 'return')
+			t.comment = self.comment
+			self.comment = None
 		return t
 
 	def token(self):
@@ -115,8 +118,11 @@ class JavaScriptLexer(object):
 					m = self.lx.search(self.s)
 					if m:
 						break
+					t += self.s + '\n'
 					if not self.nextLine():
 						errorAt("Unclosed comment.", self.lineno, self.offset)
+				t += self.s[:m.end()]
+				self.comment = t
 				self.offset += m.end()
 				if self.s[m.start()] == '/':
 					errorAt("Nested comment.", self.lineno, self.offset)
