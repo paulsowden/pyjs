@@ -614,7 +614,8 @@ def block(f=False):
 		s = statements()
 		advance('}', t)
 	else:
-		s = statements()
+		s = statement()
+		s = [s] if s else []
 	return s
 
 def optionalidentifier():
