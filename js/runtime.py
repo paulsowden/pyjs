@@ -697,7 +697,7 @@ def execute(s, c):
 	elif s.id == 'do':
 		t = True
 		while t:
-			v = execute(s.first, c)
+			v = execute(s.block, c)
 			if v[0] == 'continue' and v[2]:
 				return # TODO GOTO
 			elif v[0] == 'break' and v[2]:
