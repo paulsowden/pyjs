@@ -99,10 +99,10 @@ class JavaScriptLexer(object):
 				m = self.sx.match(t + self.s)
 				if m:
 					l = m.end() - len(t)
-					self.c = t + self.s[:l]
+					t += self.s[:l]
 					self.offset += l
 					self.s = self.s[l:]
-					return self.it('(string)', self.c)
+					return self.it('(string)', t)
 				else:
 					error()
 			# // comment
@@ -129,10 +129,10 @@ class JavaScriptLexer(object):
 				m = self.rx.match(t + self.s)
 				if m:
 					l = m.end() - len(t)
-					self.c = t + self.s[:l]
+					t += self.s[:l]
 					self.offset += l
 					self.s = self.s[l:]
-					return self.it('(regexp)', self.c)
+					return self.it('(regexp)', t)
 			# punctuator
 			return self.it('(punctuator)', t)
 
