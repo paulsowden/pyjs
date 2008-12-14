@@ -252,7 +252,7 @@ class JavaScriptFunction(JavaScriptObject):
 
 	def call(self, this, args, context):
 		c = ExecutionContext(self.symbol, this, self.scope, context, args)
-		v = execute(self.symbol.first, c)
+		v = execute(self.symbol.block, c)
 		if v[0] == 'throw':
 			raise v[1]
 		if v[0] == 'return':
@@ -491,7 +491,7 @@ def execute(s, c):
 	#print s
 	if isinstance(s, list) or s.id == '{': # block statement
 		if not isinstance(s, list):
-			s = s.first
+			s = s.block
 		if len(s) == 0:
 			return ('normal', None, None)
 		for statement in s:
@@ -688,9 +688,9 @@ def execute(s, c):
 
 	elif s.id == 'if':
 		if toBoolean(getValue(execute(s.first, c))):
-			return execute(s.second, c)
-		elif s.third:
-			return execute(s.third, c)
+			return execute(s.block, c)
+		elif hasattr(s, 'elseblock'):
+			return execute(s.elseblock, c)
 		else:
 			return ('normal', None, None)
 
@@ -710,7 +710,7 @@ def execute(s, c):
 	elif s.id == 'while':
 		v = None
 		while toBoolean(getValue(execute(s.second, c))):
-			v = execute(s.first, c)
+			v = execute(s.block, c)
 			if v[0] == 'continue' and v[2]:
 				return # TODO GOTO
 			elif v[0] == 'break' and v[2]:

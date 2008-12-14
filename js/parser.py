@@ -257,7 +257,7 @@ def nud(self):
 
 @method(symbol('{'))
 def fud(self):
-	self.first = block()
+	self.block = block()
 	advance('}', self)
 	return self
 
@@ -330,7 +330,7 @@ def function(s, is_decl=True):
 	s.functions = {}
 	s.vars = set()
 	c, context = context, s
-	s.first = block()
+	s.block = block()
 	context = c
 
 @method(stmt('function'))
@@ -352,15 +352,15 @@ def nud(self):
 	advance('(')
 	self.first = parse(10)
 	advance(')', t)
-	self.second = block()
+	self.block = block()
 	if nexttoken.id == 'else':
 		advance('else')
-		self.third = block()
+		self.elseblock = block()
 	return self
 
 @method(stmt('try'))
 def nud(self):
-	self.first = block()
+	self.block = block()
 	if nexttoken.id == 'catch':
 		advance('catch')
 		advance('(')
@@ -370,11 +370,11 @@ def nud(self):
 				"Expected an identifier and instead saw '%s'." % e, nexttoken)
 		advance()
 		advance(')')
-		self.second = block()
+		self.catchblock = block()
 		b = True
 	if nexttoken.id == 'finally':
 		advance('finally')
-		self.third = block()
+		self.finallyblock = block()
 		return self
 	elif not b:
 		raise JavaScriptSyntaxError(
@@ -386,7 +386,7 @@ def nud(self):
 	advance('(')
 	self.first = parse(10)
 	advance(')', t)
-	self.second = block()
+	self.block = block()
 	return self
 
 reserve('with')
@@ -432,7 +432,7 @@ stmt('debugger')
 
 @method(stmt('do'))
 def nud(self):
-	self.first = block()
+	self.block = block()
 	advance('while')
 	t = nexttoken
 	advance('(')
@@ -454,7 +454,7 @@ def nud(self):
 		advance('in')
 		parse(20)
 		advance(')', t)
-		self.second = block()
+		self.block = block()
 		return self
 	else:
 		if nexttoken.id != ';':
@@ -484,7 +484,7 @@ def nud(self):
 					break
 				advance(',')
 		advance(')', t)
-		self.second = block()
+		self.block = block()
 		return self
 
 @method(stmt('break'))
