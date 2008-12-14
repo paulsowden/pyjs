@@ -23,7 +23,11 @@ class Symbol(object):
 	reserved = False
 	identifier = False
 
-	def __init__(self, first=None, second=None):
+	def __init__(self, replace_token=None, first=None, second=None):
+		if replace_token:
+			self.lineno = replace_token.lineno
+			self.offset = replace_token.offset
+			self.start = replace_token.start
 		self.first = first
 		self.second = second
 
@@ -241,7 +245,7 @@ def led(self, left):
 
 @method(prefix('['))
 def nud(self):
-	s = symbol_table['(array)']()
+	s = symbol_table['(array)'](self)
 	s.first = []
 	while nexttoken.id != ']':
 		s.first.append(parse(10))
@@ -259,7 +263,7 @@ def fud(self):
 
 @method(symbol('{'))
 def nud(self):
-	s = symbol_table['(object)']()
+	s = symbol_table['(object)'](self)
 	s.first = []
 	while nexttoken.id != '}':
 		key = optionalidentifier()
@@ -286,12 +290,13 @@ def varstatement(prefix=False):
 		if prefix:
 			return [var]
 		if nexttoken.id == '=':
+			t = nexttoken
 			advance('=')
 			if peek(0).id == '=':
 				raise JavaScriptSyntaxError(
 					"Variable %s was not declared correctly."
 					% nexttoken.value, nexttoken)
-			var = symbol_table['='](var, parse(20))
+			var = symbol_table['='](t, var, parse(20))
 		vars.append(var)
 		if nexttoken.id != ',':
 			return vars
