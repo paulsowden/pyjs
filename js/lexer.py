@@ -131,7 +131,7 @@ class JavaScriptLexer(object):
 			if t == '':
 				continue
 			# /
-			if t == '/' and self.prereg:
+			if t == '/' or t == '/=' and self.prereg:
 				m = self.rx.match(t + self.s)
 				if m:
 					l = m.end() - len(t)
