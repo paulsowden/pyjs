@@ -595,7 +595,7 @@ def statement():
 		advance(';')
 		return
 	s = symbol_table['(statement)']()
-	s.comment = t.comment
+	s.comments = t.comments
 	# Is this a labelled statement?
 	if t.identifier and not t.reserved and peek().id == ':':
 		advance()
