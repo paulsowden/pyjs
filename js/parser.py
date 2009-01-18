@@ -448,11 +448,11 @@ def nud(self):
 	if peek(nexttoken.id == 'var' and 1 or 0).id == 'in':
 		if nexttoken.id == 'var':
 			advance('var')
-			varstatement(True)
+			self.iterator = varstatement(True)
 		else:
-			advance()
+			self.iterator = advance()
 		advance('in')
-		parse(20)
+		self.object = parse(20)
 		advance(')', t)
 		self.block = block()
 		return self
