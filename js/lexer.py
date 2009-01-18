@@ -1,5 +1,6 @@
 import re
 
+
 class JavaScriptLexer(object):
 
 	tx = re.compile(r"""\s*(
@@ -69,6 +70,55 @@ class JavaScriptLexer(object):
 			self.comments = []
 		return t
 
+	def parse_string(self, t):
+		r = ''
+		j = 0
+		while True:
+			while j >= len(self.s):
+				j = 0
+				if not self.nextLine():
+					errorAt("Unclosed string.", line)
+			c = self.s[j]
+			if c == t:
+				self.offset += 1
+				self.s = self.s[j+1:]
+				return self.it('(string)', r)
+			elif c < ' ':
+				if c == '\n' or c == '\r':
+					break
+				warningAt("Control character in string: {a}.", line, offset + j, s[:j])
+			elif c == '\\':
+				j += 1
+				self.offset += 1
+				c = self.s[j]
+
+				if c == 'u':
+					c = unichr(int(self.s[j+1, 4], 16))
+					j += 4
+					self.offset += 4
+				elif c == 'x':
+					c = unichr(int(self.s[j+1, 2], 16))
+					j += 2
+					self.offset += 2
+				else:
+					c = {
+						'\\': '\\',
+						"'": "'",
+						'"': '"',
+						'/': '/',
+						'b': '\b',
+						'f': '\f',
+						'n': '\n',
+						'r': '\r',
+						't': '\t',
+						'v': '\v',
+					}.get(c)
+					if c == None:
+						warningAt("Bad escapement.", line, offset)
+			r += c
+			self.offset += 1
+			j += 1
+
 	def token(self):
 		"""called by advance to get the next token."""
 
@@ -99,15 +149,7 @@ class JavaScriptLexer(object):
 				return self.it('(number)', t)
 			# string
 			if t == '"' or t == "'":
-				m = self.sx.match(t + self.s)
-				if m:
-					l = m.end() - len(t)
-					t += self.s[:l]
-					self.offset += l
-					self.s = self.s[l:]
-					return self.it('(string)', t)
-				else:
-					error()
+				return self.parse_string(t)
 			# // comment
 			if t == '//':
 				self.s = ''

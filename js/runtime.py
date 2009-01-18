@@ -519,7 +519,7 @@ def execute(s, c):
 	elif s.id == '(number)':
 		return float(s.value)
 	elif s.id == '(string)':
-		return s.value[1:-1]
+		return s.value
 	elif s.id == '(regexp)':
 		pass # TODO
 	elif s.id == 'null':
