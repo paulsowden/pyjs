@@ -292,11 +292,7 @@ def varstatement(prefix=False):
 		if nexttoken.id == '=':
 			t = nexttoken
 			advance('=')
-			if peek(0).id == '=':
-				raise JavaScriptSyntaxError(
-					"Variable %s was not declared correctly."
-					% nexttoken.value, nexttoken)
-			var = symbol_table['='](t, var, parse(20))
+			var = symbol_table['='](t, var, parse(19))
 		vars.append(var)
 		if nexttoken.id != ',':
 			return vars
