@@ -352,7 +352,7 @@ def nud(self):
 def nud(self):
 	t = nexttoken
 	advance('(')
-	self.first = parse(10)
+	self.first = parse(5)
 	advance(')', t)
 	self.block = block()
 	if nexttoken.id == 'else':
@@ -386,7 +386,7 @@ def nud(self):
 def nud(self):
 	t = nexttoken
 	advance('(')
-	self.first = parse(10)
+	self.first = parse(5)
 	advance(')', t)
 	self.block = block()
 	return self
@@ -395,7 +395,7 @@ def nud(self):
 def nud(self):
 	t = nexttoken
 	advance('(')
-	self.first = parse(10)
+	self.first = parse(5)
 	advance(')', t)
 	self.block = block()
 	return self
@@ -445,7 +445,7 @@ def nud(self):
 	advance('while')
 	t = nexttoken
 	advance('(')
-	self.second = parse(10)
+	self.second = parse(5)
 	advance(')', t)
 	return self
 
