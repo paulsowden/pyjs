@@ -156,7 +156,13 @@ symbol('<!'); symbol('</').reach = True
 
 symbol(')'); symbol(']'); symbol('}').reach = True
 symbol('"').reach = True; symbol("'").reach = True
-symbol(','); symbol(';'); symbol(':').reach = True
+symbol(';'); symbol(':').reach = True
+
+@method(symbol(',', 10))
+def led(self, left):
+	self.first = left
+	self.second = parse(0)
+	return self
 
 reserve('else')
 reserve('case').reach = True; reserve('default').reach = True
