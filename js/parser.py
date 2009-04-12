@@ -391,7 +391,14 @@ def nud(self):
 	self.block = block()
 	return self
 
-reserve('with')
+@method(stmt('with'))
+def nud(self):
+	t = nexttoken
+	advance('(')
+	self.first = parse(10)
+	advance(')', t)
+	self.block = block()
+	return self
 
 @method(stmt('switch'))
 def nud(self):
