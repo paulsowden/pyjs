@@ -115,7 +115,7 @@ class JavaScriptLexer(object):
 						'r': '\r',
 						't': '\t',
 						'v': '\v',
-					}.get(c)
+					}.get(c, c)
 			r += c
 			self.offset += 1
 			j += 1
