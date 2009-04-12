@@ -93,11 +93,11 @@ class JavaScriptLexer(object):
 				c = self.s[j]
 
 				if c == 'u':
-					c = unichr(int(self.s[j+1, 4], 16))
+					c = unichr(int(self.s[j+1:j+5], 16))
 					j += 4
 					self.offset += 4
 				elif c == 'x':
-					c = unichr(int(self.s[j+1, 2], 16))
+					c = unichr(int(self.s[j+1:j+3], 16))
 					j += 2
 					self.offset += 2
 				else:
