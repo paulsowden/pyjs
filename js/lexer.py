@@ -83,10 +83,13 @@ class JavaScriptLexer(object):
 				self.offset += 1
 				self.s = self.s[j+1:]
 				return self.it('(string)', r)
-			elif c < ' ':
-				if c == '\n' or c == '\r':
-					break
-				warningAt("Control character in string: {a}.", line, offset + j, s[:j])
+			#elif c < ' ':
+			#	if c == '\n' or c == '\r':
+			#		break
+			#	warningAt("Control character in string: {a}.", line, offset + j, s[:j])
+			elif c == '\\' and j + 1 == len(self.s):
+				self.nextLine()
+				j = 0
 			elif c == '\\':
 				j += 1
 				self.offset += 1
