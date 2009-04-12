@@ -504,13 +504,13 @@ def nud(self):
 	if context.id == '(global)':
 		raise JavaScriptSyntaxError("return declared in the global scope.", token)
 	if nexttoken.id != ';' and not nexttoken.reach:
-		self.first = parse(20)
+		self.first = parse(19)
 	#reachable('return')
 	return self
 
 @method(stmt('throw'))
 def nud(self):
-	self.first = parse(20)
+	self.first = parse(19)
 	#reachable('throw')
 	return self
 
