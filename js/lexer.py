@@ -116,8 +116,6 @@ class JavaScriptLexer(object):
 						't': '\t',
 						'v': '\v',
 					}.get(c)
-					if c == None:
-						warningAt("Bad escapement.", line, offset)
 			r += c
 			self.offset += 1
 			j += 1
