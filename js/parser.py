@@ -498,7 +498,7 @@ def nud(self):
 
 @method(stmt('break'))
 def nud(self):
-	if nexttoken.id != ';' and token.lineno == nexttoken.lineno:
+	if nexttoken.identifier and token.lineno == nexttoken.lineno:
 		advance()
 		self.first = token
 	#reachable('break')
@@ -506,7 +506,7 @@ def nud(self):
 
 @method(stmt('continue'))
 def nud(self):
-	if nexttoken.id != ';' and token.lineno == nexttoken.lineno:
+	if nexttoken.identifier and token.lineno == nexttoken.lineno:
 		advance()
 		self.first = token
 	#reachable('continue')
