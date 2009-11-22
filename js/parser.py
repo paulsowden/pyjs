@@ -176,7 +176,7 @@ reservevar('true'); reservevar('false')
 reservevar('Infinity'); reservevar('NaN')
 
 assignop('=')
-assignop('+='); assignop('-='); assignop('*='); assignop('/=') # TODO matches regexps starting with /=
+assignop('+='); assignop('-='); assignop('*='); assignop('/=')
 assignop('%='); assignop('&='); assignop('|='); assignop('^=')
 assignop('<<='); assignop('>>='); assignop('>>>=')
 
@@ -226,6 +226,7 @@ def led(self, left):
 		s = left
 	else:
 		s = self
+		self.lbp = 160
 		self.first = left
 	s.params = []
 	while nexttoken.id != ')':
@@ -366,10 +367,10 @@ def nud(self):
 	if nexttoken.id == 'catch':
 		advance('catch')
 		advance('(')
-		self.e = nexttoken.value
 		if nexttoken.id != '(identifier)':
 			raise JavaScriptSyntaxError(
-				"Expected an identifier and instead saw '%s'." % e, nexttoken)
+				"Expected an identifier and instead saw '%s'." % nexttoken.value, nexttoken)
+		self.e = nexttoken
 		advance()
 		advance(')')
 		self.catchblock = block()
@@ -377,10 +378,10 @@ def nud(self):
 	if nexttoken.id == 'finally':
 		advance('finally')
 		self.finallyblock = block()
-		return self
 	elif not b:
 		raise JavaScriptSyntaxError(
 			"Expected 'catch' and instead saw '%s'." % nexttoken.value, nexttoken)
+	return self
 
 @method(stmt('while'))
 def nud(self):
@@ -451,13 +452,13 @@ def nud(self):
 
 @method(stmt('for'))
 def nud(self):
-	# TODO store clause
 	t = nexttoken
 	advance('(')
 	if peek(nexttoken.id == 'var' and 1 or 0).id == 'in':
 		if nexttoken.id == 'var':
 			advance('var')
-			self.iterator = varstatement(True)
+			self.iterator = symbol_table['var']()
+			self.iterator.first = varstatement(True)
 		else:
 			self.iterator = advance()
 		advance('in')
@@ -469,29 +470,34 @@ def nud(self):
 		if nexttoken.id != ';':
 			if nexttoken.id == 'var':
 				advance('var')
-				varstatement()
+				self.initializer = symbol_table['var']()
+				self.initializer.first = varstatement()
 			else:
-				while 1:
-					parse(0, 'for')
-					if nexttoken.id != ',':
-						break
+				self.initializer = parse(0, 'for')
+				while nexttoken.id == ',':
+					comma = nexttoken
 					advance(',')
+					self.initializer = symbol_table[','](
+						comma, self.initializer, parse(0, 'for'))
 		advance(';')
 		if nexttoken.id != ';':
-			parse(20)
+			self.condition = parse(20)
 			if nexttoken.id == '=':
+				eq = nexttoken
 				advance('=')
-				parse(20)
+				self.condition = symbol_table['='](
+					eq, self.condition, parse(20))
 		advance(';')
 		if nexttoken.id == ';':
 			raise JavaScriptSyntaxError("Expected ')' and instead saw ';'.",
 					nexttoken)
 		if nexttoken.id != ')':
-			while 1:
-				parse(0, 'for')
-				if nexttoken.id != ',':
-					break
+			self.counter = parse(0, 'for')
+			while nexttoken.id == ',':
+				comma = nexttoken
 				advance(',')
+				self.counter = symbol_table[','](
+					comma, self.counter, parse(0, 'for'))
 		advance(')', t)
 		self.block = block()
 		return self
