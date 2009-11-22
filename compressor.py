@@ -7,6 +7,10 @@ def block(s):
 		s = s[:-1]
 	return '{'+s+'}'
 
+def paren(s, first):
+	use_paren = first.lbp and first.lbp < s.lbp
+	return ('(%s)' if use_paren else '%s') % compress(first)
+
 def alphabetic_operator_righthand(s, right):
 	right = right and compress(right) or ''
 	return s.id + \
@@ -43,25 +47,24 @@ def compress(s):
 		return 'false'
 
 	elif s.id == '(array)':
-		return '[]'
+		return '[%s]' % ','.join(compress(a) for a in s.first)
 
 	elif s.id == '(object)':
 		properties = []
 		for k, v in s.first:
-			if k.id == '(identifier)' or k.id == '(number)' \
-					or re.match(r'^[a-zA-Z_$][a-zA-Z0-9_$]*$', k.value):
-				properties.append(k.value + ':' + compress(v))
-			else: # (string)
-				properties.append(compress(k) + ':' + compress(v))
-		return '{' + ','.join(properties) + '}'
+			is_identifier = k.id == '(identifier)' or k.id == '(number)' \
+				or re.match(r'^[a-zA-Z_$][a-zA-Z0-9_$]*$', k.value)
+			key = k.value if is_identifier else compress(k)
+			properties.append('%s:%s' % (key, compress(v)))
+		return '{%s}' % ','.join(properties)
 
 
 	## Left-Hand Expressions
 
 	elif s.id == '.':
-		return compress(s.first) + '.' + compress(s.second)
+		return paren(s, s.first) + '.' + paren(s, s.second)
 	elif s.id == '[': # property
-		return compress(s.first) + '[' + compress(s.second) + ']'
+		return paren(s, s.first) + '[' + compress(s.second) + ']'
 
 	elif s.id == 'new':
 		return alphabetic_operator_righthand(s, s.first) + ('(' + \
@@ -69,46 +72,39 @@ def compress(s):
 				if hasattr(s, 'params') else '')
 
 	elif s.id == '(':
-		return  compress(s.first) + '(' + ','.join(compress(t) for t in s.params) + ')'
+		return paren(s, s.first) + '(' + ','.join(compress(t) for t in s.params) + ')'
 
 	## Unary Operators
 	elif s.id in ('typeof', 'void', 'delete'):
 		return alphabetic_operator_righthand(s, s.first)
-	elif s.id == '+' and hasattr(s, 'arity'): # unary
-		pass
-	elif s.id == '-' and hasattr(s, 'arity'): # unary
-		pass
-	elif s.id == '~':
-		return '~' + compress(s.first)
-	elif s.id == '!':
-		return '!' + compress(s.first)
+	elif s.id in ('+', '-', '++', '--') and hasattr(s, 'arity'): # unary
+		return s.id + paren(s, s.first)
+	elif s.id in ('~', '!'):
+		return s.id + paren(s, s.first)
 
-	elif s.id == '=':
-		return compress(s.first) + '=' + compress(s.second)
+	## Assignment Operator
+	elif s.id in ('=', '+=', '-=', '*=', '/='):
+		return paren(s, s.first) + s.id + paren(s, s.second)
+
+	## Comma Operator
+	elif s.id == ',':
+		return '%s,%s' % (compress(s.first), compress(s.second))
+
+	## Postfix Expressions
+	elif s.id in ('++', '--'):
+		return paren(s, s.first) + s.id
 
 	## Multiplicative Operators
-	elif s.id == '/':
-		return compress(s.first) + '/' + compress(s.second)
-	elif s.id == '*':
-		return compress(s.first) + '*' + compress(s.second)
-	elif s.id == '%':
-		return compress(s.first) + '%' + compress(s.second)
+	elif s.id in ('/', '*', '%'):
+		return paren(s, s.first) + s.id + paren(s, s.second)
 
 	## Additive Operators
-	elif s.id == '+':
-		return compress(s.first) + '+' + compress(s.second)
-	elif s.id == '-':
-		return compress(s.first) + '-' + compress(s.second)
+	elif s.id in ('+', '-'):
+		return paren(s, s.first) + s.id + paren(s, s.second)
 
 	## Relational Operators
-	elif s.id == '<':
-		return compress(s.first) + '<' + compress(s.second)
-	elif s.id == '>':
-		return compress(s.first) + '>' + compress(s.second)
-	elif s.id == '<=':
-		return compress(s.first) + '<=' + compress(s.second)
-	elif s.id == '>=':
-		return compress(s.first) + '>=' + compress(s.second)
+	elif s.id in ('<', '>', '<=', '>='):
+		return paren(s, s.first) + s.id + paren(s, s.second)
 	elif s.id in ('instanceof', 'in'):
 		# TODO omit space if the token on the imediate left of the
 		#      s.first if not an identifier
@@ -116,8 +112,8 @@ def compress(s):
 			alphabetic_operator_righthand(s, s.second)
 
 	## Equality Operators
-	elif s.id in ('==', '!=', '!==', '!===', '||', '&&', '+=', '-=', '*=', '/='):
-		return compress(s.first) + s.id + compress(s.second)
+	elif s.id in ('==', '!=', '!==', '!===', '||', '&&'):
+		return paren(s, s.first) + s.id + paren(s, s.second)
 
 	## Statements
 	elif s.id == '(statement)':
@@ -132,7 +128,7 @@ def compress(s):
 		# TODO compress vars
 		vars = []
 		for var in s.first:
-			if var.id == '(identifier)': continue
+			#if var.id == '(identifier)': continue
 			vars.append(compress(var)) # assignment
 		return 'var ' + ','.join(vars)
 
@@ -150,22 +146,36 @@ def compress(s):
 	elif s.id == 'while':
 		pass
 	elif s.id == 'for':
-		return ''#'for()'
+		if hasattr(s, 'iterator'):
+			for_loop = '%s in %s' % (compress(s.iterator), compress(s.object))
+		else:
+			for_loop = '%s;%s;%s' % (
+				compress(s.initializer) if hasattr(s, 'initializer') else '',
+				compress(s.condition) if hasattr(s, 'condition') else '',
+				compress(s.counter) if hasattr(s, 'counter') else '')
+		return 'for(%s)%s' % (for_loop, block(compress(s.block)))
 
 	elif s.id in ('continue', 'break'):
-		return 'break' + (s.first and ' ' + s.first or '')
+		return s.id + (s.first and ' ' + s.first or '')
 	elif s.id in ('return', 'throw'):
 		return alphabetic_operator_righthand(s, s.first)
 	elif s.id == 'with':
-		pass
+		return 'with(%s)%s' % (compress(s.first), block(compress(s.second)))
 	elif s.id == 'switch':
 		pass
 	elif s.id == 'try':
-		pass
+		catch = 'catch(%s){%s}' % (compress(s.e), compress(s.catchblock)) \
+			if hasattr(s, 'catchblock') else ''
+		final = 'finally{%s}' % compress(s.finallyblock) \
+			if hasattr(s, 'finallyblock') else ''
+		return 'try{%s}%s%s' % (compress(s.block), catch, final)
 	elif s.id == 'function':
-		return 'function' + (' '+s.name if s.name else '') + '('+','.join(s.params)+')' + block(compress(s.block))
-	elif s.id == 'eval':
-		return 'eval'
+		return 'function%s(%s)%s' % (
+			' ' + s.name if s.name else '',
+			','.join(s.params),
+			block(compress(s.block)))
+	#elif s.id == 'eval':
+	#	return 'eval'
 
 	elif s.id == '?':
 		return compress(s.first) + '?' + compress(s.second) + ':' + compress(s.third)
@@ -178,7 +188,9 @@ if __name__ == '__main__':
 	#js = '/home/paul/code/pyjs/test.js'
 	js = '/home/paul/code/js/ids/json.js'
 	js = '/Users/paul/Code/paulsowden.com/code/js/ids/URL.js'
-	#js = '/Users/paul/Code/paulsowden.com/code/pyjs/test/hook.js'
+	#js = '/Users/paul/Code/pyjs/test/hook.js'
+	#js = '/Users/paul/Code/pyjs/test/for.js'
+	#js = '/Users/paul/Code/pyjs/test/try.js'
 
 	ast = parse_file(js)
 	#print ast
