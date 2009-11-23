@@ -123,7 +123,7 @@ class ExecutionContext(object):
 		variables = self.scope.object
 		if hasattr(context, 'params'):
 			for i in range(len(context.params)):
-				name = context.params[i]
+				name = context.params[i].value
 				if len(args) > i:
 					variables[name] = args[i]
 				else:
@@ -743,7 +743,7 @@ def execute(s, c):
 		if s.is_decl and s.name:
 			scope = Scope(c.scope)
 			f = JavaScriptFunction(s, scope)
-			scope.object.put(s.name, f, dont_delete=True, read_only=True)
+			scope.object.put(s.name.value, f, dont_delete=True, read_only=True)
 		else:
 			f = JavaScriptFunction(s, c.scope)
 		return f

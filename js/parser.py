@@ -316,7 +316,7 @@ def functionparams():
 	p = []
 	advance('(')
 	while nexttoken.id != ')':
-		p.append(identifier().value)
+		p.append(identifier())
 		if nexttoken.id == ',':
 			advance(',')
 	advance(')', t)
@@ -325,8 +325,7 @@ def functionparams():
 def function(s, is_decl=True):
 	global context
 	s.is_decl = is_decl
-	i = optionalidentifier()
-	s.name = i and i.value or None
+	s.name = optionalidentifier()
 	if is_decl and s.name:
 		context.functions[s.name] = s
 	s.params = functionparams()
