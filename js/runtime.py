@@ -211,6 +211,10 @@ class BaseObject(object):
 		return None
 
 
+class Activation(BaseObject):
+	pass
+
+
 class BuiltinFunction(BaseObject):
 	def __init__(self, fn):
 		BaseObject.__init__(self)
@@ -257,7 +261,7 @@ class JavaScriptFunction(JavaScriptObject):
 		self['prototype'].put('constructor', self, dont_enum=True)
 
 	def call(self, this, args, context):
-		activation = BaseObject()
+		activation = Activation()
 		activation.put('arguments', ArgumentsObject(args, self),
 			dont_delete=True)
 		c = ExecutionContext(
@@ -581,11 +585,9 @@ def execute(s, c):
 		f = getValue(o)
 		if typeof(f) != 'object' or not hasattr(f, 'call'):
 			raise JavaScriptTypeError()
-		if isinstance(o, Reference):
-			this = o.base
-			# TODO check for Activation object?
-		else:
-			this = null
+		this = o.base if isinstance(o, Reference) else None
+		if this and isinstance(this, Activation):
+			this = None
 		return f.call(this, args, c)
 
 	## Unary Operators
