@@ -222,9 +222,9 @@ class BuiltinFunction(BaseObject):
 	def call(self, this, args, c):
 		return self.fn(*[this, args, c])
 
-def proto(prototype, name): # decorator
+def proto(prototype): # decorator
 	def bind(fn):
-		prototype[name] = BuiltinFunction(fn)
+		prototype[fn.__name__] = BuiltinFunction(fn)
 	return bind
 
 
@@ -233,7 +233,7 @@ def proto(prototype, name): # decorator
 class JavaScriptObject(BaseObject):
 	prototype = BaseObject()
 
-	@proto(prototype, 'toString')
+	@proto(prototype)
 	def toString(this, args, c):
 		return '[object %s]' % this.name
 
@@ -293,19 +293,19 @@ class JavaScriptString(JavaScriptObject):
 		self.value = value
 		self.put('length', float(len(value)), True, True, True)
 
-	@proto(prototype, 'toString')
+	@proto(prototype)
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@proto(prototype, 'valueOf')
+	@proto(prototype)
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@proto(prototype, 'charAt')
+	@proto(prototype)
 	def charAt(this, args, c):
 		s = toString(this)
 		n = len(args) and int(toNumber(args[0])) or 0
@@ -314,7 +314,7 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return s[n]
 
-	@proto(prototype, 'charCodeAt')
+	@proto(prototype)
 	def charCodeAt(this, args, c):
 		s = toString(this)
 		n = len(args) and int(toNumber(args[0])) or 0
@@ -323,12 +323,12 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return float(ord(s[n]))
 
-	@proto(prototype, 'concat')
+	@proto(prototype)
 	def concat(this, args, c):
 		return toString(this) + ''.join(toString(arg) for arg in args)
 
-	@proto(prototype, 'slice')
-	def concat(this, args, c):
+	@proto(prototype)
+	def slice(this, args, c):
 		s = toString(this)
 		n1 = len(args) and int(toNumber(args[0])) or 0
 		if n1 < 0:
@@ -342,12 +342,12 @@ class JavaScriptString(JavaScriptObject):
 			n2 = min(len(s), n2)
 		return s[n1:n1+max(n2-n1,0)]
 
-	@proto(prototype, 'toLowerCase')
+	@proto(prototype)
 	def toLowerCase(this, args, c):
 		return toString(this).lower()
 
-	@proto(prototype, 'toUpperCase')
-	def toLowerCase(this, args, c):
+	@proto(prototype)
+	def toUpperCase(this, args, c):
 		return toString(this).upper()
 
 class JavaScriptBoolean(JavaScriptObject):
@@ -357,13 +357,13 @@ class JavaScriptBoolean(JavaScriptObject):
 		JavaScriptObject.__init__(self)
 		self.value = value
 
-	@proto(prototype, 'toString')
+	@proto(prototype)
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
 		return toString(this.value)
 
-	@proto(prototype, 'valueOf')
+	@proto(prototype)
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
@@ -437,7 +437,7 @@ class BuiltinString(JavaScriptFunction):
 		self.put('prototype', JavaScriptString.prototype, True, True, True)
 		self['prototype']['constructor'] = self
 
-		@proto(self, 'fromCharCode')
+		@proto(self)
 		def fromCharCode(this, args, c):
 			return ''.join(chr(int(toNumber(arg))) for arg in args)
 
