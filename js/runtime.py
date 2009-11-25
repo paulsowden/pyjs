@@ -43,7 +43,7 @@ def toString(value):
 	if type == 'string':
 		return value
 	if type == 'number':
-		return str(value) # TODO
+		return str(value if value % 1 != 0 else int(value)) # TODO
 	if type == 'object':
 		return toString(toPrimitive(value, 'string'))
 	return type
