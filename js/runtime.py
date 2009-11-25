@@ -232,6 +232,7 @@ def proto(prototype): # decorator
 ## Native Objects
 
 class JavaScriptObject(BaseObject):
+	name = 'Object'
 	prototype = BaseObject()
 
 	@proto(prototype)
