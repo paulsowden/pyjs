@@ -1,3 +1,4 @@
+from parser import parse_str
 
 null = object()
 
@@ -752,6 +753,8 @@ def execute(s, c):
 
 
 def run(symbol, scope=None):
+	if isinstance(symbol, basestring):
+		symbol = parse_str(symbol)
 	c = ExecutionContext(symbol, scope=scope or global_scope())
 	return getValue(execute(symbol.first, c)[1])
 
