@@ -170,7 +170,6 @@ reserve('catch'); reserve('finally')
 
 reservevar('eval')
 reservevar('this')
-reservevar('arguments')
 reservevar('null'); reservevar('undefined')
 reservevar('true'); reservevar('false')
 reservevar('Infinity'); reservevar('NaN')
