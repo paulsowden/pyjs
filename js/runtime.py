@@ -740,7 +740,7 @@ def execute(s, c):
 	elif s.id == 'try':
 		pass
 	elif s.id == 'function':
-		if s.is_decl and s.name:
+		if not s.is_decl and s.name:
 			scope = Scope(c.scope)
 			f = JavaScriptFunction(s, scope)
 			scope.object.put(s.name.value, f, dont_delete=True, read_only=True)
