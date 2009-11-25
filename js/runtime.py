@@ -103,39 +103,34 @@ def putValue(v, w, c):
 	if not isinstance(v, Reference):
 		raise JavaScriptReferenceError()
 	if not v.base:
-		c.top.scope.object[v.property_name] = w
+		c.global_object[v.property_name] = w
 	else:
 		v.base[v.property_name] = w
 
 
 class Scope(object):
-	def __init__(self, parent=None):
-		self.object = BaseObject()
+	def __init__(self, parent=None, object=None):
 		self.parent = parent
+		self.object = object or BaseObject()
 
 
 class ExecutionContext(object):
-
-	def __init__(self, context, this=None, scope=None, parent_context=None, args=None):
-		self.scope = scope or Scope()
-		self.top = parent_context and parent_context.top or self
-		self.this = this or self.top.scope.object
-
-		variables = self.scope.object
-		if hasattr(context, 'params'):
-			for i in range(len(context.params)):
-				name = context.params[i].value
-				if len(args) > i:
-					variables[name] = args[i]
-				else:
-					variables[name] = None
-				variables.get(name).dont_delete = True
-		for name, function in context.functions.items():
-			variables.put(name, execute(function, self), dont_delete=True)
-		for name in context.vars:
-			if name not in variables:
-				variables.put(name, None, dont_delete=True)
-
+	def __init__(self, scope, this=None, global_object=None):
+		self.scope = scope
+		self.this = this or global_object
+		self.global_object = global_object
+	def instantiate_variables(self, s, vars):
+		if s.id == 'function':
+			args = vars['arguments']
+			for i, param in enumerate(s.params):
+				name = param.value
+				vars.put(param.value, args[str(i)], dont_delete=True)
+		for name, function_decl in s.functions.items():
+			vars.put(name.value, execute(function_decl, self),
+				dont_delete=True)
+		for name in s.vars:
+			if name not in vars:
+				vars.put(name, None, dont_delete=True)
 
 class Property(object):
 	read_only = False
@@ -239,6 +234,15 @@ class JavaScriptObject(BaseObject):
 	def toString(this, args, c):
 		return '[object %s]' % this.name
 
+class ArgumentsObject(JavaScriptObject):
+	prototype = JavaScriptObject.prototype
+	def __init__(self, args, callee):
+		super(ArgumentsObject, self).__init__()
+		self.put('length', len(args), dont_enum=True)
+		self.put('callee', callee, dont_enum=True)
+		for i, arg in enumerate(args):
+			self.put(str(i), arg, dont_enum=True)
+
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
 	prototype = JavaScriptObject()
@@ -253,7 +257,12 @@ class JavaScriptFunction(JavaScriptObject):
 		self['prototype'].put('constructor', self, dont_enum=True)
 
 	def call(self, this, args, context):
-		c = ExecutionContext(self.symbol, this, self.scope, context, args)
+		activation = BaseObject()
+		activation.put('arguments', ArgumentsObject(args, self),
+			dont_delete=True)
+		c = ExecutionContext(
+			Scope(self.scope, activation), this, context.global_object)
+		c.instantiate_variables(self.symbol, activation)
 		v = execute(self.symbol.block, c)
 		if v[0] == 'throw':
 			raise v[1]
@@ -474,15 +483,12 @@ class BuiltinBoolean(JavaScriptFunction):
 			b = False
 		return JavaScriptBoolean(b)
 
-def global_scope():
-	global_scope = Scope()
-	s = global_scope.object
-
-	s['Object'] = BuiltinObject()
-	s['String'] = BuiltinString()
-	s['Boolean'] = BuiltinBoolean()
-
-	return global_scope
+def global_object():
+	o = BaseObject()
+	o.put('Object', BuiltinObject(), dont_enum=True)
+	o.put('String', BuiltinString(), dont_enum=True)
+	o.put('Boolean', BuiltinBoolean(), dont_enum=True)
+	return o
 
 
 ## Execute
@@ -753,10 +759,12 @@ def execute(s, c):
 	raise RuntimeError, "unknown operation %s" % s.id
 
 
-def run(symbol, scope=None):
+def run(symbol, object=None):
 	if isinstance(symbol, basestring):
 		symbol = parse_str(symbol)
-	c = ExecutionContext(symbol, scope=scope or global_scope())
+	object = object or global_object()
+	c = ExecutionContext(Scope(object=object), object, object)
+	c.instantiate_variables(symbol, object)
 	return getValue(execute(symbol.first, c)[1])
 
 
