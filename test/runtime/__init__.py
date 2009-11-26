@@ -1,13 +1,15 @@
 
 import unittest
 
-import function, if_, delete
+import function, if_, delete, string, globals
 
 def suite():
 	suite = unittest.TestSuite([
 		function.suite(),
 		if_.suite(),
 		delete.suite(),
+		string.suite(),
+		globals.suite(),
 		])
 	return suite
 

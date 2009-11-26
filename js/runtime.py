@@ -1,6 +1,10 @@
+from math import isinf, isnan, copysign
 from parser import parse_str
 
 null = object()
+inf = float('inf')
+neginf = float('-inf')
+nan = float('nan')
 
 def typeof(value):
 	if value is None:
@@ -29,12 +33,25 @@ def toBoolean(value):
 		or isinstance(value, str) and len(str) == 0)
 
 def toNumber(value):
+	if value is None:
+		return nan
 	if value is null:
 		return 0
+	if isinstance(value, bool):
+		return 1 if value else 0
 	if isinstance(value, float):
 		return value
-	# TODO
-	return float(value)
+	if isinstance(value, basestring):
+		return float(value) # TODO
+	return toNumber(toPrimitive(value, 'number'))
+
+def toInteger(value):
+	value = toNumber(value)
+	if isnan(value) or value == 0:
+		return 0
+	if isinf(value):
+		return value
+	return int(copysign(1, value) * (abs(value) // 1))
 
 def toString(value):
 	type = typeof(value)
@@ -221,6 +238,9 @@ class BuiltinFunction(BaseObject):
 		self.fn = fn
 	def call(self, this, args, c):
 		return self.fn(*[this, args, c])
+	@property
+	def name(self):
+		return self.fn.__name__
 
 def proto(prototype): # decorator
 	def bind(fn):
@@ -323,7 +343,7 @@ class JavaScriptString(JavaScriptObject):
 	@proto(prototype)
 	def charAt(this, args, c):
 		s = toString(this)
-		n = len(args) and int(toNumber(args[0])) or 0
+		n = len(args) and toInteger(args[0]) or 0
 		if n < 0 or n > len(s):
 			return ''
 		else:
@@ -332,9 +352,9 @@ class JavaScriptString(JavaScriptObject):
 	@proto(prototype)
 	def charCodeAt(this, args, c):
 		s = toString(this)
-		n = len(args) and int(toNumber(args[0])) or 0
+		n = len(args) and toInteger(args[0]) or 0
 		if n < 0 or n > len(s):
-			return 0 # TODO return NaN
+			return nan
 		else:
 			return float(ord(s[n]))
 
@@ -345,17 +365,31 @@ class JavaScriptString(JavaScriptObject):
 	@proto(prototype)
 	def slice(this, args, c):
 		s = toString(this)
-		n1 = len(args) and int(toNumber(args[0])) or 0
+		n1 = len(args) and toInteger(args[0]) or 0
 		if n1 < 0:
 			n1 = max(n1+len(s), 0)
 		else:
 			n1 = min(len(s), n1)
-		n2 = len(args) > 1 and int(toNumber(args[1])) or 0
+		n2 = len(args) > 1 and toInteger(args[1]) or 0
 		if n2 < 0:
 			n2 = max(n2+len(s), 0)
 		else:
 			n2 = min(len(s), n2)
 		return s[n1:n1+max(n2-n1,0)]
+
+	@proto(prototype)
+	def substr(this, args, c):
+		s = toString(this)
+		start = toInteger(args[0] if len(args) else None)
+		length = args[1] if len(args) > 1 else None
+		if length is not None:
+			length = toInteger(length)
+		else:
+			length = inf
+		if start < 0:
+			start = max(len(s) + start, 0)
+		length = min(max(length, 0), len(s) - start)
+		return s[start:start + length]
 
 	@proto(prototype)
 	def toLowerCase(this, args, c):
@@ -454,7 +488,7 @@ class BuiltinString(JavaScriptFunction):
 
 		@proto(self)
 		def fromCharCode(this, args, c):
-			return ''.join(chr(int(toNumber(arg))) for arg in args)
+			return ''.join(chr(toInteger(arg)) for arg in args)
 
 	def call(self, this, args, c):
 		if len(args) == 0:
@@ -487,15 +521,33 @@ class BuiltinBoolean(JavaScriptFunction):
 			b = False
 		return JavaScriptBoolean(b)
 
+def builtin(fn):
+	return BuiltinFunction(fn)
 
 class GlobalObject(BaseObject):
 	def __init__(self):
 		super(GlobalObject, self).__init__()
+
+		self.put('NaN', nan, dont_delete=True, dont_enum=True)
+		self.put('Infinity', inf, dont_delete=True, dont_enum=True)
 		self.put('undefined', None, dont_delete=True, dont_enum=True)
+
 		self.put('Object', BuiltinObject(), dont_enum=True)
 		self.put('String', BuiltinString(), dont_enum=True)
 		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
 
+		builtin_function = lambda fn: self.put(fn.name, fn)
+		builtin_function(self.isNaN)
+		builtin_function(self.isFinite)
+
+	@builtin
+	def isNaN(this, args, c):
+		return isnan(toNumber(args[0] if len(args) else None))
+
+	@builtin
+	def isFinite(this, args, c):
+		n = toNumber(args[0] if len(args) else None)
+		return not isinf(n) and not isnan(n)
 
 ## Execute
 
