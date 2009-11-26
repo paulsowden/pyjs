@@ -245,7 +245,8 @@ class BuiltinFunction(BaseObject):
 		return self.fn(this, args, c)
 
 # decorator
-def proto(prototype, length=0, read_only=None, dont_enum=True, dont_delete=None):
+def builtin(prototype, length=0,
+		read_only=None, dont_enum=True, dont_delete=None):
 	def bind(fn):
 		prototype[fn.__name__] = BuiltinFunction(fn, length)
 		if read_only is not None:
@@ -263,7 +264,7 @@ class JavaScriptObject(BaseObject):
 	name = 'Object'
 	prototype = BaseObject()
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toString(this, args, c):
 		return '[object %s]' % this.name
 
@@ -329,53 +330,53 @@ class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
 	prototype = JavaScriptObject()
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toString(this, args, c):
 		if not isintance(this, JavaScriptArray):
 			raise JavaScriptTypeError()
 		# TODO return join()
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toLocaleString(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def concat(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def join(this, args, c):
 		pass # TODO
 
-	@proto(prototype)
+	@builtin(prototype)
 	def pop(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def push(this, args, c):
 		pass # TODO
 
-	@proto(prototype)
+	@builtin(prototype)
 	def reverse(this, args, c):
 		pass # TODO
 
-	@proto(prototype)
+	@builtin(prototype)
 	def shift(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def slice(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def sort(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def splice(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def unshift(this, args, c):
 		pass # TODO
 
@@ -387,19 +388,19 @@ class JavaScriptString(JavaScriptObject):
 		self.value = value
 		self.put('length', float(len(value)), True, True, True)
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@proto(prototype)
+	@builtin(prototype)
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def charAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -408,7 +409,7 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return s[n]
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def charCodeAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -417,35 +418,35 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return float(ord(s[n]))
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def concat(this, args, c):
 		return toString(this) + ''.join(toString(arg) for arg in args)
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def indexOf(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def lastIndexOf(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def localeCompare(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def match(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def replace(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=1)
+	@builtin(prototype, length=1)
 	def search(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def slice(this, args, c):
 		s = toString(this)
 		n1 = len(args) and toInteger(args[0]) or 0
@@ -460,11 +461,11 @@ class JavaScriptString(JavaScriptObject):
 			n2 = min(len(s), n2)
 		return s[n1:n1+max(n2-n1,0)]
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def split(this, args, c):
 		pass # TODO
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def substr(this, args, c):
 		s = toString(this)
 		start = toInteger(args[0] if len(args) else None)
@@ -478,23 +479,23 @@ class JavaScriptString(JavaScriptObject):
 		length = min(max(length, 0), len(s) - start)
 		return s[start:start + length]
 
-	@proto(prototype, length=2)
+	@builtin(prototype, length=2)
 	def substring(this, args, c):
 		pass # TODO
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toLowerCase(this, args, c):
 		return toString(this).lower()
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toLocaleLowerCase(this, args, c):
 		pass # TODO
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toUpperCase(this, args, c):
 		return toString(this).upper()
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toLocaleUpperCase(this, args, c):
 		pass # TODO
 
@@ -505,13 +506,13 @@ class JavaScriptBoolean(JavaScriptObject):
 		JavaScriptObject.__init__(self)
 		self.value = value
 
-	@proto(prototype)
+	@builtin(prototype)
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
 		return toString(this.value)
 
-	@proto(prototype)
+	@builtin(prototype)
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
@@ -601,7 +602,7 @@ class BuiltinString(JavaScriptFunction):
 		self.put('prototype', JavaScriptString.prototype, True, True, True)
 		self['prototype']['constructor'] = self
 
-		@proto(self, length=1)
+		@builtin(self, length=1)
 		def fromCharCode(this, args, c):
 			return ''.join(chr(toInteger(arg)) for arg in args)
 
@@ -650,11 +651,11 @@ class GlobalObject(BaseObject):
 		self.put('String', BuiltinString(), dont_enum=True)
 		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
 
-		@proto(self, length=1)
+		@builtin(self, length=1)
 		def isNaN(this, args, c):
 			return isnan(toNumber(args[0] if len(args) else None))
 
-		@proto(self, length=1)
+		@builtin(self, length=1)
 		def isFinite(this, args, c):
 			n = toNumber(args[0] if len(args) else None)
 			return not isinf(n) and not isnan(n)
