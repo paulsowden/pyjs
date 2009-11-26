@@ -1,0 +1,29 @@
+#!/usr/bin/python
+
+import os, readline, atexit
+from js.runtime import run, GlobalObject, toRepr
+
+def setup_history():
+	history_file = os.path.join(os.environ["HOME"], ".pyjs_history")
+	try:
+	    readline.read_history_file(history_file)
+	except IOError:
+	    pass
+	atexit.register(readline.write_history_file, history_file)
+
+if __name__ == '__main__':
+	setup_history()
+
+	global_object = GlobalObject()
+	while 1:
+		try:
+			cmd = raw_input('pyjs> ')
+		except EOFError:
+			print
+			break
+		try:
+			#print toRepr(run(cmd, global_object))
+			print run(cmd, global_object)
+		except Exception, e:
+			print e
+
