@@ -1,10 +1,14 @@
 
 import unittest
 
-import function, if_
+import function, if_, delete
 
 def suite():
-	suite = unittest.TestSuite([function.suite(), if_.suite()])
+	suite = unittest.TestSuite([
+		function.suite(),
+		if_.suite(),
+		delete.suite(),
+		])
 	return suite
 
 if __name__ == '__main__':
