@@ -168,11 +168,9 @@ reserve('else')
 reserve('case').reach = True; reserve('default').reach = True
 reserve('catch'); reserve('finally')
 
-reservevar('eval')
 reservevar('this')
 reservevar('null')
 reservevar('true'); reservevar('false')
-reservevar('Infinity'); reservevar('NaN')
 
 assignop('=')
 assignop('+='); assignop('-='); assignop('*='); assignop('/=')
@@ -534,18 +532,12 @@ def nud(self):
 reserve('void')
 
 # Superfluous reserved words
-
-reserve('class')
-reserve('const')
-reserve('enum')
-reserve('export')
-reserve('extends')
-reserve('float')
-reserve('goto')
-reserve('import')
-reserve('let')
-reserve('super')
-
+map(reserve,
+	['abstract', 'boolean', 'byte', 'char', 'class', 'const', 'debugger',
+	'double', 'enum', 'export', 'extends', 'final', 'float', 'goto',
+	'implements', 'import', 'int', 'interface', 'long', 'native', 'package',
+	'private', 'protected', 'public', 'short', 'static', 'super',
+	'synchronized', 'throws', 'transient', 'volatile'])
 
 
 
