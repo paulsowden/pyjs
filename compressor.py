@@ -39,8 +39,6 @@ def compress(s):
 		return s.value
 	elif s.id == 'null':
 		return 'null'
-	elif s.id == 'undefined':
-		return 'undefined'
 	elif s.id == 'true':
 		return 'true'
 	elif s.id == 'false':

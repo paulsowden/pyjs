@@ -536,8 +536,6 @@ def execute(s, c):
 		pass # TODO
 	elif s.id == 'null':
 		return null
-	elif s.id == 'undefined':
-		return None
 	elif s.id == 'true':
 		return True
 	elif s.id == 'false':
