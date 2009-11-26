@@ -1,7 +1,7 @@
 
 import unittest
 
-from js.runtime import run, global_object
+from js.runtime import run, GlobalObject
 
 class ElsePrecedence(unittest.TestCase):
 
@@ -31,12 +31,12 @@ class ElsePrecedence(unittest.TestCase):
 	"""
 
 	def testPrecedence(self):
-		object = global_object()
-		run(self.js, object)
+		global_object = GlobalObject()
+		run(self.js, global_object)
 
-		self.assertEqual(run("a(0,0)", object), 3);
-		self.assertEqual(run("b(0,0)", object), 2);
-		self.assertEqual(run("c(0,0)", object), 3);
+		self.assertEqual(run("a(0,0)", global_object), 3);
+		self.assertEqual(run("b(0,0)", global_object), 2);
+		self.assertEqual(run("c(0,0)", global_object), 3);
 
 def suite():
 	suite = unittest.TestSuite([

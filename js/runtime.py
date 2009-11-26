@@ -487,12 +487,14 @@ class BuiltinBoolean(JavaScriptFunction):
 			b = False
 		return JavaScriptBoolean(b)
 
-def global_object():
-	o = BaseObject()
-	o.put('Object', BuiltinObject(), dont_enum=True)
-	o.put('String', BuiltinString(), dont_enum=True)
-	o.put('Boolean', BuiltinBoolean(), dont_enum=True)
-	return o
+
+class GlobalObject(BaseObject):
+	def __init__(self):
+		super(GlobalObject, self).__init__()
+		self.put('undefined', None, dont_delete=True, dont_enum=True)
+		self.put('Object', BuiltinObject(), dont_enum=True)
+		self.put('String', BuiltinString(), dont_enum=True)
+		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
 
 
 ## Execute
@@ -759,12 +761,13 @@ def execute(s, c):
 	raise RuntimeError, "unknown operation %s" % s.id
 
 
-def run(symbol, object=None):
+def run(symbol, global_object=None):
 	if isinstance(symbol, basestring):
 		symbol = parse_str(symbol)
-	object = object or global_object()
-	c = ExecutionContext(Scope(object=object), object, object)
-	c.instantiate_variables(symbol, object)
+	global_object = global_object or GlobalObject()
+	c = ExecutionContext(Scope(object=global_object),
+		global_object, global_object)
+	c.instantiate_variables(symbol, global_object)
 	return getValue(execute(symbol.first, c)[1])
 
 
