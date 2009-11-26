@@ -242,13 +242,17 @@ class BuiltinFunction(BaseObject):
 		self.fn = fn
 	def call(self, this, args, c):
 		return self.fn(*[this, args, c])
-	@property
-	def name(self):
-		return self.fn.__name__
 
-def proto(prototype): # decorator
+# decorator
+def proto(prototype, read_only=None, dont_enum=None, dont_delete=None):
 	def bind(fn):
 		prototype[fn.__name__] = BuiltinFunction(fn)
+		if read_only is not None:
+			prototype.get(fn.__name__).read_only = read_only
+		if dont_enum is not None:
+			prototype.get(fn.__name__).dont_enum = dont_enum
+		if dont_delete is not None:
+			prototype.get(fn.__name__).dont_enum = dont_delete
 	return bind
 
 
@@ -525,8 +529,6 @@ class BuiltinBoolean(JavaScriptFunction):
 			b = False
 		return JavaScriptBoolean(b)
 
-def builtin(fn):
-	return BuiltinFunction(fn)
 
 class GlobalObject(BaseObject):
 	def __init__(self):
@@ -540,18 +542,14 @@ class GlobalObject(BaseObject):
 		self.put('String', BuiltinString(), dont_enum=True)
 		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
 
-		builtin_function = lambda fn: self.put(fn.name, fn)
-		builtin_function(self.isNaN)
-		builtin_function(self.isFinite)
+		@proto(self, dont_enum=True)
+		def isNaN(this, args, c):
+			return isnan(toNumber(args[0] if len(args) else None))
 
-	@builtin
-	def isNaN(this, args, c):
-		return isnan(toNumber(args[0] if len(args) else None))
-
-	@builtin
-	def isFinite(this, args, c):
-		n = toNumber(args[0] if len(args) else None)
-		return not isinf(n) and not isnan(n)
+		@proto(self, dont_enum=True)
+		def isFinite(this, args, c):
+			n = toNumber(args[0] if len(args) else None)
+			return not isinf(n) and not isnan(n)
 
 ## Execute
 
