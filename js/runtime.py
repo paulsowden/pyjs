@@ -237,16 +237,17 @@ class Activation(BaseObject):
 
 
 class BuiltinFunction(BaseObject):
-	def __init__(self, fn):
+	def __init__(self, fn, length=0):
 		BaseObject.__init__(self)
 		self.fn = fn
+		self.put('length', length, True, True, True)
 	def call(self, this, args, c):
-		return self.fn(*[this, args, c])
+		return self.fn(this, args, c)
 
 # decorator
-def proto(prototype, read_only=None, dont_enum=None, dont_delete=None):
+def proto(prototype, length=0, read_only=None, dont_enum=True, dont_delete=None):
 	def bind(fn):
-		prototype[fn.__name__] = BuiltinFunction(fn)
+		prototype[fn.__name__] = BuiltinFunction(fn, length)
 		if read_only is not None:
 			prototype.get(fn.__name__).read_only = read_only
 		if dont_enum is not None:
@@ -328,6 +329,56 @@ class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
 	prototype = JavaScriptObject()
 
+	@proto(prototype)
+	def toString(this, args, c):
+		if not isintance(this, JavaScriptArray):
+			raise JavaScriptTypeError()
+		# TODO return join()
+
+	@proto(prototype)
+	def toLocaleString(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def concat(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def join(this, args, c):
+		pass # TODO
+
+	@proto(prototype)
+	def pop(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def push(this, args, c):
+		pass # TODO
+
+	@proto(prototype)
+	def reverse(this, args, c):
+		pass # TODO
+
+	@proto(prototype)
+	def shift(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=2)
+	def slice(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def sort(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=2)
+	def splice(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def unshift(this, args, c):
+		pass # TODO
+
 class JavaScriptString(JavaScriptObject):
 	name = 'String'
 	prototype = JavaScriptObject()
@@ -348,7 +399,7 @@ class JavaScriptString(JavaScriptObject):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@proto(prototype)
+	@proto(prototype, length=1)
 	def charAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -357,7 +408,7 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return s[n]
 
-	@proto(prototype)
+	@proto(prototype, length=1)
 	def charCodeAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -366,11 +417,35 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return float(ord(s[n]))
 
-	@proto(prototype)
+	@proto(prototype, length=1)
 	def concat(this, args, c):
 		return toString(this) + ''.join(toString(arg) for arg in args)
 
-	@proto(prototype)
+	@proto(prototype, length=1)
+	def indexOf(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def lastIndexOf(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def localeCompare(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def match(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=2)
+	def replace(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=1)
+	def search(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=2)
 	def slice(this, args, c):
 		s = toString(this)
 		n1 = len(args) and toInteger(args[0]) or 0
@@ -385,7 +460,11 @@ class JavaScriptString(JavaScriptObject):
 			n2 = min(len(s), n2)
 		return s[n1:n1+max(n2-n1,0)]
 
-	@proto(prototype)
+	@proto(prototype, length=2)
+	def split(this, args, c):
+		pass # TODO
+
+	@proto(prototype, length=2)
 	def substr(this, args, c):
 		s = toString(this)
 		start = toInteger(args[0] if len(args) else None)
@@ -399,13 +478,25 @@ class JavaScriptString(JavaScriptObject):
 		length = min(max(length, 0), len(s) - start)
 		return s[start:start + length]
 
+	@proto(prototype, length=2)
+	def substring(this, args, c):
+		pass # TODO
+
 	@proto(prototype)
 	def toLowerCase(this, args, c):
 		return toString(this).lower()
 
 	@proto(prototype)
+	def toLocaleLowerCase(this, args, c):
+		pass # TODO
+
+	@proto(prototype)
 	def toUpperCase(this, args, c):
 		return toString(this).upper()
+
+	@proto(prototype)
+	def toLocaleUpperCase(this, args, c):
+		pass # TODO
 
 class JavaScriptBoolean(JavaScriptObject):
 	name = 'Boolean'
@@ -488,13 +579,29 @@ class BuiltinObject(JavaScriptFunction):
 			o = args[0]
 		return toObject(o)
 
+class BuiltinArray(JavaScriptFunction):
+	def __init__(self):
+		BaseObject.__init__(self)
+		self.put('prototype', JavaScriptArray.prototype, True, True, True)
+		self['prototype']['constructor'] = self
+	def call(self, this, args, s):
+		return self.construct(args, s)
+	def construct(self, args, s):
+		if len(args) == 1:
+			# TODO create an array with length args[0]
+			pass
+		else:
+			# TODO create an array with elements args
+			pass
+		return JavaScriptArray()
+
 class BuiltinString(JavaScriptFunction):
 	def __init__(self):
 		BaseObject.__init__(self)
 		self.put('prototype', JavaScriptString.prototype, True, True, True)
 		self['prototype']['constructor'] = self
 
-		@proto(self)
+		@proto(self, length=1)
 		def fromCharCode(this, args, c):
 			return ''.join(chr(toInteger(arg)) for arg in args)
 
@@ -539,14 +646,15 @@ class GlobalObject(BaseObject):
 		self.put('undefined', None, dont_delete=True, dont_enum=True)
 
 		self.put('Object', BuiltinObject(), dont_enum=True)
+		self.put('Array', BuiltinArray(), dont_enum=True)
 		self.put('String', BuiltinString(), dont_enum=True)
 		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
 
-		@proto(self, dont_enum=True)
+		@proto(self, length=1)
 		def isNaN(this, args, c):
 			return isnan(toNumber(args[0] if len(args) else None))
 
-		@proto(self, dont_enum=True)
+		@proto(self, length=1)
 		def isFinite(this, args, c):
 			n = toNumber(args[0] if len(args) else None)
 			return not isinf(n) and not isnan(n)
