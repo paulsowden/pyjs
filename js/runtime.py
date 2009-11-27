@@ -75,15 +75,16 @@ def toRepr(value):
 		return '"%s"' % value
 	return toString(value)
 
-def toObject(value):
+def toObject(value, c):
+	prototype = lambda o: getattr(c.global_object, o)['prototype']
 	if value is None or value is null:
-		raise JavaScriptTypeError()
+		raise JavaScriptTypeError() # TODO prototype
 	if isinstance(value, bool):
-		return JavaScriptBoolean(value)
+		return JavaScriptBoolean(prototype('boolean'), value)
 	if isinstance(value, float):
-		return JavaScriptNumber(value)
+		return JavaScriptNumber(prototype('number'), value)
 	if isinstance(value, str):
-		return JavaScriptString(value)
+		return JavaScriptString(prototype('string'), value)
 	return value
 
 def lessThan(x, y):
@@ -129,47 +130,22 @@ def putValue(v, w, c):
 		v.base[v.property_name] = w
 
 
-class Scope(object):
-	def __init__(self, parent=None, object=None):
-		self.parent = parent
-		self.object = object or BaseObject()
-
-
-class ExecutionContext(object):
-	def __init__(self, scope, this=None, global_object=None):
-		self.scope = scope
-		self.this = this or global_object
-		self.global_object = global_object
-	def instantiate_variables(self, s, vars):
-		if s.id == 'function':
-			args = vars['arguments']
-			for i, param in enumerate(s.params):
-				name = param.value
-				vars.put(param.value, args[str(i)], dont_delete=True)
-		for name, function_decl in s.functions.items():
-			vars.put(name.value, execute(function_decl, self),
-				dont_delete=True)
-		for name in s.vars:
-			if name not in vars:
-				vars.put(name, None, dont_delete=True)
+## Native Objects
 
 class Property(object):
-	read_only = False
-	dont_enum = False
-	dont_delete = False
-	internal = False
-	def __init__(self, value, read_only=False, dont_enum=False, dont_delete=False):
+	__slots__ = ['value', 'read_only', 'dont_enum', 'dont_delete']
+	def __init__(self,
+			value, read_only=False, dont_enum=False, dont_delete=False):
 		self.value = value
-		if read_only: self.read_only = True
-		if dont_enum: self.dont_enum = True
-		if dont_delete: self.dont_delete = True
+		self.read_only = read_only
+		self.dont_enum = dont_enum
+		self.dont_delete = dont_delete
 
-
-class BaseObject(object):
+class JavaScriptObject(object):
 	name = 'Object' # [[Class]]
-	prototype = None # [[Prototype]]
 
-	def __init__(self):
+	def __init__(self, prototype=None):
+		self.prototype = prototype # [[Prototype]]
 		self.properties = {}
 
 	def __getitem__(self, key): # [[Get]]
@@ -194,7 +170,8 @@ class BaseObject(object):
 		self.properties[key] = Property(value)
 		return value
 
-	def put(self, key, value, read_only=False, dont_enum=False, dont_delete=False):
+	def put(self, key, value,
+			read_only=False, dont_enum=False, dont_delete=False):
 		if key in self.properties:
 			prop = self.properties[key]
 			prop.value = value
@@ -202,7 +179,8 @@ class BaseObject(object):
 			prop.dont_enum = dont_enum
 			prop.dont_delete = dont_delete
 		else:
-			self.properties[key] = Property(value, read_only, dont_enum, dont_delete)
+			self.properties[key] = Property(value,
+				read_only, dont_enum, dont_delete)
 		return value
 
 	def __delitem__(self, key): # [[Delete]]
@@ -214,7 +192,8 @@ class BaseObject(object):
 		return True
 
 	def __contains__(self, key): # [[HasProperty]]
-		return (key in self.properties) or self.prototype and (key in self.prototype)
+		return (key in self.properties) \
+			or self.prototype and (key in self.prototype)
 
 	def can_put(self, key): # [[CanPut]]
 		if key in self.properties:
@@ -231,47 +210,37 @@ class BaseObject(object):
 		# TODO
 		return None
 
+class Scope(object):
+	__slots__ = ['parent', 'object']
+	def __init__(self, parent=None, object=None):
+		self.parent = parent
+		self.object = object or JavaScriptObject()
 
-class Activation(BaseObject):
+class ExecutionContext(object):
+	__slots__ = ['scope', 'this', 'global_object']
+	def __init__(self, scope, this=None, global_object=None):
+		self.scope = scope
+		self.this = this or global_object
+		self.global_object = global_object
+	def instantiate_variables(self, s, vars):
+		if s.id == 'function':
+			args = vars['arguments']
+			for i, param in enumerate(s.params):
+				name = param.value
+				vars.put(param.value, args[str(i)], dont_delete=True)
+		for name, function_decl in s.functions.items():
+			vars.put(name.value, execute(function_decl, self),
+				dont_delete=True)
+		for name in s.vars:
+			if name not in vars:
+				vars.put(name, None, dont_delete=True)
+
+class Activation(JavaScriptObject):
 	pass
 
-
-class BuiltinFunction(BaseObject):
-	def __init__(self, fn, length=0):
-		BaseObject.__init__(self)
-		self.fn = fn
-		self.put('length', length, True, True, True)
-	def call(self, this, args, c):
-		return self.fn(this, args, c)
-
-# decorator
-def builtin(prototype, length=0,
-		read_only=None, dont_enum=True, dont_delete=None):
-	def bind(fn):
-		prototype[fn.__name__] = BuiltinFunction(fn, length)
-		if read_only is not None:
-			prototype.get(fn.__name__).read_only = read_only
-		if dont_enum is not None:
-			prototype.get(fn.__name__).dont_enum = dont_enum
-		if dont_delete is not None:
-			prototype.get(fn.__name__).dont_enum = dont_delete
-	return bind
-
-
-## Native Objects
-
-class JavaScriptObject(BaseObject):
-	name = 'Object'
-	prototype = BaseObject()
-
-	@builtin(prototype)
-	def toString(this, args, c):
-		return '[object %s]' % this.name
-
 class ArgumentsObject(JavaScriptObject):
-	prototype = JavaScriptObject.prototype
-	def __init__(self, args, callee):
-		super(ArgumentsObject, self).__init__()
+	def __init__(self, prototype, args, callee):
+		super(ArgumentsObject, self).__init__(prototype)
 		self.put('length', len(args), dont_enum=True)
 		self.put('callee', callee, dont_enum=True)
 		for i, arg in enumerate(args):
@@ -279,23 +248,23 @@ class ArgumentsObject(JavaScriptObject):
 
 class JavaScriptFunction(JavaScriptObject):
 	name = 'Function'
-	prototype = JavaScriptObject()
-	def __init__(self, s, scope):
-		JavaScriptObject.__init__(self)
+	def __init__(self, prototype, s, scope):
+		super(JavaScriptFunction, self).__init__(prototype)
 
 		self.symbol = s
 		self.scope = scope
 
 		self.put('length', float(len(s.params)), True, True, True)
-		self.put('prototype', JavaScriptObject(), dont_delete=True)
+		self.put('prototype', JavaScriptObject(prototype), dont_delete=True)
 		self['prototype'].put('constructor', self, dont_enum=True)
 
 	def call(self, this, args, context):
+		global_object = context.global_object
 		activation = Activation()
-		activation.put('arguments', ArgumentsObject(args, self),
+		activation.put('arguments',
+			ArgumentsObject(global_object.object['prototype'], args, self),
 			dont_delete=True)
-		c = ExecutionContext(
-			Scope(self.scope, activation), this, context.global_object)
+		c = ExecutionContext(Scope(self.scope, activation), this, global_object)
 		c.instantiate_variables(self.symbol, activation)
 		v = execute(self.symbol.block, c)
 		if v[0] == 'throw':
@@ -306,9 +275,11 @@ class JavaScriptFunction(JavaScriptObject):
 			return None
 
 	def construct(self, args, context):
-		o = JavaScriptObject()
-		if isinstance(self['prototype'], BaseObject):
-			o.prototype = self['prototype']
+		if isinstance(self['prototype'], JavaScriptObject):
+			prototype = self['prototype']
+		else:
+			prototype = context.global_object.object['prototype']
+		o = JavaScriptObject(prototype)
 		v = self.call(o, args, context)
 		if typeof(v) == 'object':
 			return v
@@ -328,79 +299,228 @@ class JavaScriptFunction(JavaScriptObject):
 
 class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
-	prototype = JavaScriptObject()
 
-	@builtin(prototype)
+class JavaScriptString(JavaScriptObject):
+	name = 'String'
+	def __init__(self, prototype, value=''):
+		super(JavaScriptString, self).__init__(prototype)
+		self.value = value
+		self.put('length', float(len(value)), True, True, True)
+
+class JavaScriptBoolean(JavaScriptObject):
+	name = 'Boolean'
+	def __init__(self, prototype, value=False):
+		super(JavaScriptBoolean, self).__init__(prototype)
+		self.value = value
+
+class JavaScriptNumber(JavaScriptObject):
+	name = 'Number'
+	def __init__(self, prototype, value=0.0):
+		super(JavaScriptNumber, self).__init__(prototype)
+		self.value = value
+
+class JavaScriptMath(JavaScriptObject):
+	name = 'Math'
+
+class JavaScriptDate(JavaScriptObject):
+	name = 'Date'
+
+class JavaScriptRegExp(JavaScriptObject):
+	name = 'RegExp'
+	def __init__(self, prototype):
+		super(JavaScriptRegExp, self).__init__(prototype)
+		self.put('source', None, True, True, True) # TODO
+		self.put('global', False, True, True, True) # TODO
+		self.put('ignoreCase', False, True, True, True) # TODO
+		self.put('multiline', False, True, True, True) # TODO
+		self.put('lastIndex', 0, dont_delete=True, dont_enum=True) # TODO
+
+
+## Builtin Prototypes
+
+class JavaScriptNativeFunctionWrapper(object):
+	def __init__(self, fn, length, name):
+		self.fn = fn
+		self.length = length
+		self.name = name
+
+class JavaScriptNativeFunction(JavaScriptObject):
+	def __init__(self, prototype, native_function):
+		super(JavaScriptNativeFunction, self).__init__(prototype)
+		self.fn = native_function.fn
+		self.put('length', native_function.length, True, True, True)
+	def call(self, this, args, c):
+		return self.fn(this, args, c)
+
+class NativeFunctions(type):
+	def __new__(mcs, name, bases, dict):
+
+		functions = {}
+		for key, function in dict.items():
+			if isinstance(function, JavaScriptNativeFunctionWrapper):
+				del dict[key]
+				functions[function.name] = function
+		dict['functions'] = functions
+
+		def bind(self, object, prototype):
+			for name, function in self.functions.items():
+				object.put(name, JavaScriptNativeFunction(prototype, function),
+					dont_enum=True)
+			return self
+		dict['bind'] = bind
+
+		return type.__new__(mcs, name, bases, dict)
+
+def native(fn=None, length=0, name=None):
+	def bind(fn):
+		return JavaScriptNativeFunctionWrapper(fn, length, name or fn.__name__)
+	return bind(fn) if fn else bind
+
+class JavaScriptNativePrototype(JavaScriptObject):
+	def __init__(self, prototype=None, function_prototype=None):
+		super(JavaScriptNativePrototype, self).__init__(prototype)
+		if function_prototype:
+			self.bind(self, function_prototype)
+
+class JavaScriptObjectPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
+
+	@native
+	def toString(this, args, c):
+		return '[object %s]' % this.name
+
+	@native
+	def toLocaleString(this, args, c):
+		pass # TODO
+
+	@native
+	def valueOf(this, args, c):
+		return this
+
+	@native(length=1)
+	def hasOwnProperty(this, args, c):
+		return toString(args[0] if len(args) else None) in this.properties
+
+	@native(length=1)
+	def isPrototypeOf(this, args, c):
+		if not len(args) or typeof(args[0]) != 'object':
+			return False
+		prototype = args[0].prototype
+		while prototype and prototype != null:
+			if prototype == this:
+				return True
+			prototype = prototype.prototype
+		return False
+
+	@native(length=1)
+	def propertyIsEnumerable(this, args, c):
+		property = toString(args[0] if len(args) else None)
+		return not property in this.properties \
+			or not this.get(property).dont_enum
+
+class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
+
+	@native
+	def toString(this, args, c):
+		pass # TODO
+
+	@native(length=2)
+	def apply(this, args, c):
+		if not hasattr(this, 'call'):
+			raise JavaScriptTypeError()
+		thisArg = args[0] if len(args) else None
+		thisArg = c.global_object \
+			if thisArg is None or thisArg is null else toObject(thisArg, c)
+		argArray = args[1] if len(args) > 1 else None
+		if argArray is None or argArray is null:
+			argArray = []
+		elif isinstance(argArray, ArgumentsObject):
+			argArray = [] # TODO
+		elif isinstance(argArray, JavaScriptArray):
+			argArray = [] # TODO
+		else:
+			raise JavaScriptTypeError()
+		return this.call(thisArg, argArray, c)
+
+	@native(length=1)
+	def call(this, args, c):
+		if not hasattr(this, 'call'):
+			raise JavaScriptTypeError()
+		thisArg = args[0] if len(args) else None
+		thisArg = c.global_object \
+			if thisArg is None or thisArg is null else toObject(thisArg, c)
+		return this.call(thisArg, args[1:], c)
+
+class JavaScriptArrayPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
+
+	@native
 	def toString(this, args, c):
 		if not isintance(this, JavaScriptArray):
 			raise JavaScriptTypeError()
 		# TODO return join()
 
-	@builtin(prototype)
+	@native
 	def toLocaleString(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def concat(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def join(this, args, c):
 		pass # TODO
 
-	@builtin(prototype)
+	@native
 	def pop(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def push(this, args, c):
 		pass # TODO
 
-	@builtin(prototype)
+	@native
 	def reverse(this, args, c):
 		pass # TODO
 
-	@builtin(prototype)
+	@native
 	def shift(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def slice(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def sort(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def splice(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def unshift(this, args, c):
 		pass # TODO
 
-class JavaScriptString(JavaScriptObject):
-	name = 'String'
-	prototype = JavaScriptObject()
-	def __init__(self, value=''):
-		JavaScriptObject.__init__(self)
-		self.value = value
-		self.put('length', float(len(value)), True, True, True)
+class JavaScriptStringPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
 
-	@builtin(prototype)
+	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@builtin(prototype)
+	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptString):
 			raise JavaScriptTypeError()
 		return this.value
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def charAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -409,7 +529,7 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return s[n]
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def charCodeAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
@@ -418,35 +538,35 @@ class JavaScriptString(JavaScriptObject):
 		else:
 			return float(ord(s[n]))
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def concat(this, args, c):
 		return toString(this) + ''.join(toString(arg) for arg in args)
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def indexOf(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def lastIndexOf(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def localeCompare(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def match(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def replace(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=1)
+	@native(length=1)
 	def search(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def slice(this, args, c):
 		s = toString(this)
 		n1 = len(args) and toInteger(args[0]) or 0
@@ -461,11 +581,11 @@ class JavaScriptString(JavaScriptObject):
 			n2 = min(len(s), n2)
 		return s[n1:n1+max(n2-n1,0)]
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def split(this, args, c):
 		pass # TODO
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def substr(this, args, c):
 		s = toString(this)
 		start = toInteger(args[0] if len(args) else None)
@@ -479,132 +599,332 @@ class JavaScriptString(JavaScriptObject):
 		length = min(max(length, 0), len(s) - start)
 		return s[start:start + length]
 
-	@builtin(prototype, length=2)
+	@native(length=2)
 	def substring(this, args, c):
 		pass # TODO
 
-	@builtin(prototype)
+	@native
 	def toLowerCase(this, args, c):
 		return toString(this).lower()
 
-	@builtin(prototype)
+	@native
 	def toLocaleLowerCase(this, args, c):
 		pass # TODO
 
-	@builtin(prototype)
+	@native
 	def toUpperCase(this, args, c):
 		return toString(this).upper()
 
-	@builtin(prototype)
+	@native
 	def toLocaleUpperCase(this, args, c):
 		pass # TODO
 
-class JavaScriptBoolean(JavaScriptObject):
-	name = 'Boolean'
-	prototype = JavaScriptObject()
-	def __init__(self, value=False):
-		JavaScriptObject.__init__(self)
-		self.value = value
+class JavaScriptBooleanPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
 
-	@builtin(prototype)
+	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
 		return toString(this.value)
 
-	@builtin(prototype)
+	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
 			raise JavaScriptTypeError()
 		return this.value
 
-class JavaScriptNumber(JavaScriptObject):
-	name = 'Number'
-	prototype = JavaScriptObject()
-	def __init__(self, value=0.0):
-		self.value = value
+class JavaScriptNumberPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
 
-class JavaScriptDate(JavaScriptObject):
-	name = 'Date'
-	prototype = JavaScriptObject()
+	@native(length=1)
+	def toString(this, args, c):
+		pass # TODO
 
-class JavaScriptRegExp(JavaScriptObject):
-	name = 'RegExp'
-	prototype = JavaScriptObject()
+	@native
+	def toLocaleString(this, args, c):
+		pass # TODO
 
+	@native
+	def valueOf(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def toFixed(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def toExponential(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def toPrecision(this, args, c):
+		pass # TODO
+
+class JavaScriptDatePrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
+
+	@native
+	def toString(this, args, c):
+		pass # TODO
+
+	@native
+	def toDateString(this, args, c):
+		pass # TODO
+
+	@native
+	def toTimeString(this, args, c):
+		pass # TODO
+
+	@native
+	def toLocaleString(this, args, c):
+		pass # TODO
+
+	@native
+	def toLocaleDateString(this, args, c):
+		pass # TODO
+
+	@native
+	def toLocaleTimeString(this, args, c):
+		pass # TODO
+
+	@native
+	def valueOf(this, args, c):
+		pass # TODO
+
+	@native
+	def getTime(this, args, c):
+		pass # TODO
+
+	@native
+	def getFullYear(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCFullYear(this, args, c):
+		pass # TODO
+
+	@native
+	def getMonth(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCMonth(this, args, c):
+		pass # TODO
+
+	@native
+	def	getDate(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCDate(this, args, c):
+		pass # TODO
+
+	@native
+	def getDay(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCDay(this, args, c):
+		pass # TODO
+
+	@native
+	def getHours(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCHours(this, args, c):
+		pass # TODO
+
+	@native
+	def getMinutes(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCMinutes(this, args, c):
+		pass # TODO
+
+	@native
+	def getSeconds(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCSeconds(this, args, c):
+		pass # TODO
+
+	@native
+	def getMilliseconds(this, args, c):
+		pass # TODO
+
+	@native
+	def getUTCMilliseconds(this, args, c):
+		pass # TODO
+
+	@native
+	def getTimezoneOffset(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def	setTime(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setMilliseconds(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCMilliseconds(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setSeconds(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCSeconds(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setMinutes(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCMinutes(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setMonth(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCMonth(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setHours(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCHours(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setDay(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCDay(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def	setDate(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCDate(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setFullYear(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def setUTCFullYear(this, args, c):
+		pass # TODO
+
+	@native
+	def toUTCString(this, args, c):
+		pass # TODO
+
+class JavaScriptRegExpPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
+
+	@native(length=1, name='exec')
+	def exec_(this, args, c):
+		pass # TODO
+
+	@native(length=1)
+	def test(this, args, c):
+		pass # TODO
+
+	@native
+	def toString(this, args, c):
+		pass # TODO
 
 ## Errors
 
 class JavaScriptError(JavaScriptObject):
 	name = 'Error'
-	prototype = JavaScriptObject()
 	def __str__(self):
 		return '%s: %s' % (self.name, toString(self['message']))
 
 class JavaScriptEvalError(JavaScriptError):
 	name = 'EvalError'
-	prototype = JavaScriptError()
 
 class JavaScriptRangeError(JavaScriptError):
 	name = 'RangeError'
-	prototype = JavaScriptError()
 
 class JavaScriptReferenceError(JavaScriptError):
 	name = 'ReferenceError'
-	prototype = JavaScriptError()
 
 class JavaScriptSyntaxError(JavaScriptError):
 	name = 'SyntaxError'
-	prototype = JavaScriptError()
 
 class JavaScriptTypeError(JavaScriptError):
 	name = 'TypeError'
-	prototype = JavaScriptError()
 
 class JavaScriptURIError(JavaScriptError):
 	name = 'URIError'
-	prototype = JavaScriptError()
 
 
 ## Global Scope
 
-class BuiltinObject(JavaScriptFunction):
-	def __init__(self):
-		BaseObject.__init__(self)
-		self.put('prototype', JavaScriptObject.prototype, True, True, True)
+class JavaScriptObjectConstructor(JavaScriptFunction):
+	def __init__(self, prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype', prototype, True, True, True)
 		self['prototype']['constructor'] = self
+		prototype.bind(prototype, function_prototype)
 	def call(self, this, args, c):
 		if len(args) == 0:
-			o = JavaScriptObject()
+			o = JavaScriptObject(self['prototype'])
 		else:
 			o = args[0]
-		return toObject(o)
+		return toObject(o, c)
 
-class BuiltinArray(JavaScriptFunction):
-	def __init__(self):
-		BaseObject.__init__(self)
-		self.put('prototype', JavaScriptArray.prototype, True, True, True)
+class JavaScriptFunctionConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype):
+		function_prototype = JavaScriptFunctionPrototype(object_prototype)
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype', function_prototype, True, True, True)
+		self['prototype']['constructor'] = self
+		function_prototype.bind(function_prototype, function_prototype)
+
+class JavaScriptArrayConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptArrayPrototype(object_prototype, function_prototype),
+			True, True, True)
 		self['prototype']['constructor'] = self
 	def call(self, this, args, s):
 		return self.construct(args, s)
 	def construct(self, args, s):
 		if len(args) == 1:
 			# TODO create an array with length args[0]
-			pass
+			return JavaScriptArray(self['prototype'])
 		else:
 			# TODO create an array with elements args
-			pass
-		return JavaScriptArray()
+			return JavaScriptArray(self['prototype'])
 
-class BuiltinString(JavaScriptFunction):
-	def __init__(self):
-		BaseObject.__init__(self)
-		self.put('prototype', JavaScriptString.prototype, True, True, True)
+class JavaScriptStringConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptStringPrototype(object_prototype, function_prototype),
+			True, True, True)
 		self['prototype']['constructor'] = self
-
-		@builtin(self, length=1)
-		def fromCharCode(this, args, c):
-			return ''.join(chr(toInteger(arg)) for arg in args)
+		self.JavaScriptStringFunctions().bind(self, function_prototype)
 
 	def call(self, this, args, c):
 		if len(args) == 0:
@@ -617,12 +937,21 @@ class BuiltinString(JavaScriptFunction):
 			s = toString(args[0])
 		else:
 			s = ''
-		return JavaScriptString(s)
+		return JavaScriptString(self['prototype'], s)
 
-class BuiltinBoolean(JavaScriptFunction):
-	def __init__(self):
-		BaseObject.__init__(self)
-		self.put('prototype', JavaScriptBoolean.prototype, True, True, True)
+	class JavaScriptStringFunctions(object):
+		__metaclass__ = NativeFunctions
+
+		@native(length=1)
+		def fromCharCode(this, args, c):
+			return ''.join(chr(toInteger(arg)) for arg in args)
+
+class JavaScriptBooleanConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptBooleanPrototype(object_prototype, function_prototype),
+			True, True, True)
 		self['prototype']['constructor'] = self
 	def call(self, this, args, c):
 		if len(args):
@@ -635,30 +964,119 @@ class BuiltinBoolean(JavaScriptFunction):
 			b = toBoolean(args[0])
 		else:
 			b = False
-		return JavaScriptBoolean(b)
+		return JavaScriptBoolean(self['prototype'], b)
 
+class JavaScriptNumberConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptNumberPrototype(object_prototype, function_prototype),
+			True, True, True)
+		self['prototype']['constructor'] = self
 
-class GlobalObject(BaseObject):
+class JavaScriptDateConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptDatePrototype(object_prototype, function_prototype),
+			True, True, True)
+		self['prototype']['constructor'] = self
+
+	class JavaScriptDateFunctions(object):
+		__metaclass__ = NativeFunctions
+
+		@native(length=1)
+		def parse(this, args, c):
+			pass # TODO
+
+		@native(length=7)
+		def UTC(this, args, c):
+			pass # TODO
+
+class JavaScriptRegExpConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('prototype',
+			JavaScriptRegExpPrototype(object_prototype, function_prototype),
+			True, True, True)
+		self['prototype']['constructor'] = self
+
+class GlobalObject(JavaScriptObject):
 	def __init__(self):
 		super(GlobalObject, self).__init__()
+
+		object_prototype = JavaScriptObjectPrototype()
+		self.function = JavaScriptFunctionConstructor(object_prototype)
+		function_prototype = self.function['prototype']
+
+		op, fp = object_prototype, function_prototype
+		self.object = JavaScriptObjectConstructor(op, fp)
+		self.array = JavaScriptArrayConstructor(op, fp)
+		self.string = JavaScriptStringConstructor(op, fp)
+		self.boolean = JavaScriptBooleanConstructor(op, fp)
+		self.number = JavaScriptNumberConstructor(op, fp)
+		self.math = JavaScriptMath(op)
+		self.date = JavaScriptDateConstructor(op, fp)
+		self.regexp = JavaScriptRegExpConstructor(op, fp)
 
 		self.put('NaN', nan, dont_delete=True, dont_enum=True)
 		self.put('Infinity', inf, dont_delete=True, dont_enum=True)
 		self.put('undefined', None, dont_delete=True, dont_enum=True)
 
-		self.put('Object', BuiltinObject(), dont_enum=True)
-		self.put('Array', BuiltinArray(), dont_enum=True)
-		self.put('String', BuiltinString(), dont_enum=True)
-		self.put('Boolean', BuiltinBoolean(), dont_enum=True)
+		self.put('Object', self.object, dont_enum=True)
+		self.put('Function', self.function, dont_enum=True)
+		self.put('Array', self.array, dont_enum=True)
+		self.put('String', self.string, dont_enum=True)
+		self.put('Boolean', self.boolean, dont_enum=True)
+		self.put('Number', self.number, dont_enum=True)
+		self.put('Math', self.math, dont_enum=True)
+		self.put('Date', self.date, dont_enum=True)
+		self.put('RegExp', self.regexp, dont_enum=True)
 
-		@builtin(self, length=1)
+		self.GlobalFunctions().bind(self, function_prototype)
+
+	class GlobalFunctions(object):
+		__metaclass__ = NativeFunctions
+
+		@native(length=1)
+		def eval(this, args, c):
+			if not len(args) or not isinstance(args[0], basestring):
+				return args[0] if len(args) else None
+			pass # TODO
+
+		@native(length=2)
+		def parseInt(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def parseFloat(this, args, c):
+			pass # TODO
+
+		@native(length=1)
 		def isNaN(this, args, c):
 			return isnan(toNumber(args[0] if len(args) else None))
 
-		@builtin(self, length=1)
+		@native(length=1)
 		def isFinite(this, args, c):
 			n = toNumber(args[0] if len(args) else None)
 			return not isinf(n) and not isnan(n)
+
+		@native(length=1)
+		def decodeURI(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def decodeURIComponent(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def encodeURI(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def encodeURIComponent(this, args, c):
+			pass # TODO
+
 
 ## Execute
 
@@ -674,7 +1092,7 @@ def execute(s, c):
 		for statement in s:
 			try:
 				v = execute(statement, c)
-			except BaseObject, e:
+			except JavaScriptObject, e:
 				return ('throw', e, None)
 			if v[0] != 'normal':
 				return v
@@ -707,11 +1125,11 @@ def execute(s, c):
 		return False
 
 	elif s.id == '(array)':
-		array = JavaScriptArray()
+		array = c.global_object.array.construct([], c)
 		return array
 
 	elif s.id == '(object)':
-		o = JavaScriptObject()
+		o = c.global_object.object.construct([], c)
 		for k, v in s.first:
 			if k.id == '(identifier)':
 				key = k.value
@@ -726,11 +1144,13 @@ def execute(s, c):
 	## Left-Hand Expressions
 
 	elif s.id == '.':
-		return Reference(toObject(getValue(execute(s.first, c))), s.second.value)
+		return Reference(
+			toObject(getValue(execute(s.first, c)), c),
+			s.second.value)
 	elif s.id == '[': # property
 		l = getValue(execute(s.first, c))
 		r = getValue(execute(s.second, c))
-		return Reference(toObject(l), toString(r))
+		return Reference(toObject(l, c), toString(r))
 
 	elif s.id == 'new':
 		l = getValue(execute(s.first, c))
@@ -824,7 +1244,7 @@ def execute(s, c):
 	elif s.id == 'instanceof':
 		l = getValue(execute(s.first, c))
 		r = getValue(execute(s.second, c))
-		if not isinstance(r, BaseObject):
+		if not isinstance(r, JavaScriptObject):
 			raise JavaScriptTypeError()
 		if not hasattr(r, 'has_instance'):
 			raise JavaScriptTypeError()
@@ -832,7 +1252,7 @@ def execute(s, c):
 	elif s.id == 'in':
 		l = getValue(execute(s.first, c))
 		r = getValue(execute(s.second, c))
-		if not isinstance(r, BaseObject):
+		if not isinstance(r, JavaScriptObject):
 			raise JavaScriptTypeError()
 		return toString(l) in r
 
@@ -913,12 +1333,13 @@ def execute(s, c):
 	elif s.id == 'try':
 		pass
 	elif s.id == 'function':
+		prototype = c.global_object.function['prototype']
 		if not s.is_decl and s.name:
 			scope = Scope(c.scope)
-			f = JavaScriptFunction(s, scope)
+			f = JavaScriptFunction(prototype, s, scope)
 			scope.object.put(s.name.value, f, dont_delete=True, read_only=True)
 		else:
-			f = JavaScriptFunction(s, c.scope)
+			f = JavaScriptFunction(prototype, s, c.scope)
 		return f
 
 	raise RuntimeError, "unknown operation %s" % s.id
