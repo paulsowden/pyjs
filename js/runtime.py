@@ -344,13 +344,15 @@ class JavaScriptNativeFunctionWrapper(object):
 		self.length = length
 		self.name = name
 
-class JavaScriptNativeFunction(JavaScriptObject):
+class JavaScriptNativeFunction(JavaScriptFunction):
 	def __init__(self, prototype, native_function):
-		super(JavaScriptNativeFunction, self).__init__(prototype)
+		JavaScriptObject.__init__(self, prototype)
 		self.fn = native_function.fn
 		self.put('length', native_function.length, True, True, True)
 	def call(self, this, args, c):
 		return self.fn(this, args, c)
+	def construct(self, this, args, c):
+		raise JavaScriptTypeError()
 
 class NativeFunctions(type):
 	def __new__(mcs, name, bases, dict):
@@ -423,6 +425,8 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 
 	@native
 	def toString(this, args, c):
+		if not hasattr(this, 'symbol'):
+			return 'function () { [native code] }'
 		pass # TODO
 
 	@native(length=2)
