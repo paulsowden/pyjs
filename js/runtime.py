@@ -882,6 +882,7 @@ class JavaScriptURIError(JavaScriptError):
 class JavaScriptObjectConstructor(JavaScriptFunction):
 	def __init__(self, prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype', prototype, True, True, True)
 		self['prototype']['constructor'] = self
 		prototype.bind(prototype, function_prototype)
@@ -896,6 +897,7 @@ class JavaScriptFunctionConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype):
 		function_prototype = JavaScriptFunctionPrototype(object_prototype)
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype', function_prototype, True, True, True)
 		self['prototype']['constructor'] = self
 		function_prototype.bind(function_prototype, function_prototype)
@@ -903,6 +905,7 @@ class JavaScriptFunctionConstructor(JavaScriptFunction):
 class JavaScriptArrayConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptArrayPrototype(object_prototype, function_prototype),
 			True, True, True)
@@ -920,6 +923,7 @@ class JavaScriptArrayConstructor(JavaScriptFunction):
 class JavaScriptStringConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptStringPrototype(object_prototype, function_prototype),
 			True, True, True)
@@ -949,6 +953,7 @@ class JavaScriptStringConstructor(JavaScriptFunction):
 class JavaScriptBooleanConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptBooleanPrototype(object_prototype, function_prototype),
 			True, True, True)
@@ -969,6 +974,7 @@ class JavaScriptBooleanConstructor(JavaScriptFunction):
 class JavaScriptNumberConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptNumberPrototype(object_prototype, function_prototype),
 			True, True, True)
@@ -977,6 +983,7 @@ class JavaScriptNumberConstructor(JavaScriptFunction):
 class JavaScriptDateConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptDatePrototype(object_prototype, function_prototype),
 			True, True, True)
