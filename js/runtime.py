@@ -108,6 +108,7 @@ def lessThan(x, y):
 
 
 class Reference(object):
+	__slots__ = ['base', 'property_name']
 	def __init__(self, base, property_name):
 		self.base = base
 		self.property_name = property_name
