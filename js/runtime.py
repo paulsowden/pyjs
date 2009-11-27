@@ -253,7 +253,7 @@ class JavaScriptFunction(JavaScriptObject):
 		super(JavaScriptFunction, self).__init__(prototype)
 
 		self.symbol = s
-		self.scope = scope
+		self.scope = scope # [[Scope]]
 
 		self.put('length', float(len(s.params)), True, True, True)
 		self.put('prototype', JavaScriptObject(prototype), dont_delete=True)
@@ -319,9 +319,6 @@ class JavaScriptNumber(JavaScriptObject):
 	def __init__(self, prototype, value=0.0):
 		super(JavaScriptNumber, self).__init__(prototype)
 		self.value = value
-
-class JavaScriptMath(JavaScriptObject):
-	name = 'Math'
 
 class JavaScriptDate(JavaScriptObject):
 	name = 'Date'
@@ -897,6 +894,10 @@ class JavaScriptFunctionConstructor(JavaScriptFunction):
 		self.put('prototype', function_prototype, True, True, True)
 		self['prototype']['constructor'] = self
 		function_prototype.bind(function_prototype, function_prototype)
+	def call(self, this, args, c):
+		pass # TODO
+	def construct(self, args, c):
+		pass # TODO
 
 class JavaScriptArrayConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
@@ -961,6 +962,107 @@ class JavaScriptNumberConstructor(JavaScriptFunction):
 			True, True, True)
 		self['prototype']['constructor'] = self
 
+		self.put('MAX_VALUE', 0, True, True, True) # TODO
+		self.put('MIN_VALUE', 0, True, True, True) # TODO
+		self.put('NaN', nan, True, True, True)
+		self.put('NEGATIVE_INFINITY', neginf, True, True, True)
+		self.put('POSITIVE_INFINITY', inf, True, True, True)
+	def call(self, this, args, c):
+		pass # TODO
+	def construct(self, args, c):
+		pass # TODO
+
+class JavaScriptMath(JavaScriptObject):
+	name = 'Math'
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+
+		self.put('E', 0, True, True, True) # TODO
+		self.put('LN10', 0, True, True, True) # TODO
+		self.put('LN2', 0, True, True, True) # TODO
+		self.put('LOG2E', 0, True, True, True) # TODO
+		self.put('LOG10E', 0, True, True, True) # TODO
+		self.put('PI', 0, True, True, True) # TODO
+		self.put('SQRT1_2', 0, True, True, True) # TODO
+		self.put('SQRT2', 0, True, True, True) # TODO
+
+		self.JavaScriptMathFunctions().bind(self, function_prototype)
+
+	class JavaScriptMathFunctions(object):
+		__metaclass__ = NativeFunctions
+
+		@native(length=1)
+		def abs(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def acos(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def asin(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def atan(this, args, c):
+			pass # TODO
+
+		@native(length=2)
+		def atan2(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def ceil(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def cos(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def exp(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def floor(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def log(this, args, c):
+			pass # TODO
+
+		@native(length=2)
+		def max(this, args, c):
+			pass # TODO
+
+		@native(length=2)
+		def min(this, args, c):
+			pass # TODO
+
+		@native(length=2)
+		def pow(this, args, c):
+			pass # TODO
+
+		@native
+		def random(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def round(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def sin(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def sqrt(this, args, c):
+			pass # TODO
+
+		@native(length=1)
+		def tan(this, args, c):
+			pass # TODO
+
 class JavaScriptDateConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
@@ -969,6 +1071,11 @@ class JavaScriptDateConstructor(JavaScriptFunction):
 			JavaScriptDatePrototype(object_prototype, function_prototype),
 			True, True, True)
 		self['prototype']['constructor'] = self
+		self.JavaScriptDateFunctions().bind(self, function_prototype)
+	def call(self, this, args, c):
+		pass # TODO
+	def construct(self, args, c):
+		pass # TODO
 
 	class JavaScriptDateFunctions(object):
 		__metaclass__ = NativeFunctions
@@ -984,10 +1091,15 @@ class JavaScriptDateConstructor(JavaScriptFunction):
 class JavaScriptRegExpConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
 		self.put('prototype',
 			JavaScriptRegExpPrototype(object_prototype, function_prototype),
 			True, True, True)
 		self['prototype']['constructor'] = self
+	def call(self, this, args, c):
+		pass # TODO
+	def construct(self, args, c):
+		pass # TODO
 
 class GlobalObject(JavaScriptObject):
 	def __init__(self):
@@ -997,29 +1109,25 @@ class GlobalObject(JavaScriptObject):
 		self.function = JavaScriptFunctionConstructor(object_prototype)
 		function_prototype = self.function['prototype']
 
-		op, fp = object_prototype, function_prototype
-		self.object = JavaScriptObjectConstructor(op, fp)
-		self.array = JavaScriptArrayConstructor(op, fp)
-		self.string = JavaScriptStringConstructor(op, fp)
-		self.boolean = JavaScriptBooleanConstructor(op, fp)
-		self.number = JavaScriptNumberConstructor(op, fp)
-		self.math = JavaScriptMath(op)
-		self.date = JavaScriptDateConstructor(op, fp)
-		self.regexp = JavaScriptRegExpConstructor(op, fp)
+		def put(attr, name, constructor):
+			o = constructor(object_prototype, function_prototype)
+			setattr(self, attr, o)
+			self.put(name, o, dont_enum=True)
+
+		put('object', 'Object', JavaScriptObjectConstructor)
+		put('array', 'Array', JavaScriptArrayConstructor)
+		put('string', 'String', JavaScriptStringConstructor)
+		put('boolean', 'Boolean', JavaScriptBooleanConstructor)
+		put('number', 'Number', JavaScriptNumberConstructor)
+		put('math', 'Math', JavaScriptMath)
+		put('date', 'Date', JavaScriptDateConstructor)
+		put('regexp', 'RegExp', JavaScriptRegExpConstructor)
+
+		self.put('Function', self.function, dont_enum=True)
 
 		self.put('NaN', nan, dont_delete=True, dont_enum=True)
 		self.put('Infinity', inf, dont_delete=True, dont_enum=True)
 		self.put('undefined', None, dont_delete=True, dont_enum=True)
-
-		self.put('Object', self.object, dont_enum=True)
-		self.put('Function', self.function, dont_enum=True)
-		self.put('Array', self.array, dont_enum=True)
-		self.put('String', self.string, dont_enum=True)
-		self.put('Boolean', self.boolean, dont_enum=True)
-		self.put('Number', self.number, dont_enum=True)
-		self.put('Math', self.math, dont_enum=True)
-		self.put('Date', self.date, dont_enum=True)
-		self.put('RegExp', self.regexp, dont_enum=True)
 
 		self.GlobalFunctions().bind(self, function_prototype)
 
