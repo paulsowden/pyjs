@@ -1137,12 +1137,9 @@ def execute(s, c):
 
 	elif s.id == 'new':
 		l = getValue(execute(s.first, c))
+		args = [getValue(execute(arg, c)) for arg in getattr(s, 'params', [])]
 		if typeof(l) != 'object' or not hasattr(l, 'construct'):
 			raise JavaScriptTypeError()
-		if hasattr(s, 'params'):
-			args = [getValue(execute(arg, c)) for arg in s.params]
-		else:
-			args = []
 		return l.construct(args, c)
 
 	elif s.id == '(':
