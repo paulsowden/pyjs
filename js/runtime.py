@@ -524,19 +524,13 @@ class JavaScriptStringPrototype(JavaScriptNativePrototype):
 	def charAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
-		if n < 0 or n > len(s):
-			return ''
-		else:
-			return s[n]
+		return '' if n < 0 or n > len(s) else s[n]
 
 	@native(length=1)
 	def charCodeAt(this, args, c):
 		s = toString(this)
 		n = len(args) and toInteger(args[0]) or 0
-		if n < 0 or n > len(s):
-			return nan
-		else:
-			return float(ord(s[n]))
+		return nan if n < 0 or n > len(s) else float(ord(s[n]))
 
 	@native(length=1)
 	def concat(this, args, c):
@@ -887,10 +881,7 @@ class JavaScriptObjectConstructor(JavaScriptFunction):
 		self['prototype']['constructor'] = self
 		prototype.bind(prototype, function_prototype)
 	def call(self, this, args, c):
-		if len(args) == 0:
-			o = JavaScriptObject(self['prototype'])
-		else:
-			o = args[0]
+		o = args[0] if len(args) else JavaScriptObject(self['prototype'])
 		return toObject(o, c)
 
 class JavaScriptFunctionConstructor(JavaScriptFunction):
@@ -929,18 +920,10 @@ class JavaScriptStringConstructor(JavaScriptFunction):
 			True, True, True)
 		self['prototype']['constructor'] = self
 		self.JavaScriptStringFunctions().bind(self, function_prototype)
-
 	def call(self, this, args, c):
-		if len(args) == 0:
-			s = ''
-		else:
-			s = args[0]
-		return toString(s)
+		return toString(args[0]) if len(args) else ''
 	def construct(self, args, c):
-		if len(args):
-			s = toString(args[0])
-		else:
-			s = ''
+		s = toString(args[0]) if len(args) else ''
 		return JavaScriptString(self['prototype'], s)
 
 	class JavaScriptStringFunctions(object):
@@ -959,16 +942,9 @@ class JavaScriptBooleanConstructor(JavaScriptFunction):
 			True, True, True)
 		self['prototype']['constructor'] = self
 	def call(self, this, args, c):
-		if len(args):
-			b = toBoolean(args[0])
-		else:
-			b = False
-		return b
+		return toBoolean(args[0]) if len(args) else False
 	def construct(self, args, c):
-		if len(args):
-			b = toBoolean(args[0])
-		else:
-			b = False
+		b = toBoolean(args[0]) if len(args) else False
 		return JavaScriptBoolean(self['prototype'], b)
 
 class JavaScriptNumberConstructor(JavaScriptFunction):
