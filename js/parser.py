@@ -452,7 +452,8 @@ def nud(self):
 			self.iterator = symbol_table['var']()
 			self.iterator.first = varstatement(True)
 		else:
-			self.iterator = advance()
+			self.iterator = nexttoken
+			advance('(identifier)')
 		advance('in')
 		self.object = parse(20)
 		advance(')', t)

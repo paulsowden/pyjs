@@ -153,6 +153,7 @@ class JavaScriptObject(object):
 	def __init__(self, prototype=None):
 		self.prototype = prototype # [[Prototype]]
 		self.properties = {}
+		self.ordered_keys = []
 
 	def __getitem__(self, key): # [[Get]]
 		if key in self.properties:
@@ -173,7 +174,9 @@ class JavaScriptObject(object):
 			return False
 		if key in self.properties:
 			self.properties[key].value = value
-		self.properties[key] = Property(value)
+		else:
+			self.properties[key] = Property(value)
+			self.ordered_keys.append(key)
 		return value
 
 	def put(self, key, value,
@@ -187,6 +190,7 @@ class JavaScriptObject(object):
 		else:
 			self.properties[key] = Property(value,
 				read_only, dont_enum, dont_delete)
+			self.ordered_keys.append(key)
 		return value
 
 	def __delitem__(self, key): # [[Delete]]
@@ -195,11 +199,25 @@ class JavaScriptObject(object):
 		if self.properties[key].dont_delete:
 			return False
 		del self.properties[key]
+		self.ordered_keys.remove(key)
 		return True
 
 	def __contains__(self, key): # [[HasProperty]]
 		return (key in self.properties) \
 			or self.prototype and (key in self.prototype)
+
+	def __iter__(self):
+		keys = []
+		object = self
+		while object:
+			for key in object.ordered_keys:
+				if not key in keys:
+					keys.append(key)
+			object = object.prototype
+		for key in keys:
+			property = self.get(key)
+			if property and not property.dont_enum:
+				yield key
 
 	def can_put(self, key): # [[CanPut]]
 		if key in self.properties:
@@ -1480,8 +1498,41 @@ def execute(s, c):
 				return v
 		return ('normal', v[1], None)
 	elif s.id == 'for':
-		pass
-
+		v = None
+		if hasattr(s, 'iterator'):
+			o = toObject(getValue(execute(s.object, c), c), c)
+			identifier = s.iterator
+			if identifier.id == 'var':
+				execute(identifier, c)
+				identifier = identifier.first[0]
+			for key in o:
+				putValue(execute(identifier, c), key, c)
+				result = execute(s.block, c)
+				v = result[1]
+				if result[0] == 'break':
+					break
+				if result[0] == 'continue': # TODO label
+					continue
+				if result[0] in ('return', 'throw'):
+					return result
+		else:
+			if hasattr(s, 'initializer'):
+				i = execute(s.initializer, c)
+				if not s.initializer.id == 'var':
+					getValue(i, c)
+			while 1:
+				if hasattr(s, 'condition') and \
+						not toBoolean(getValue(execute(s.condition, c), c)):
+					break
+				result = execute(s.block, c)
+				v = result[1]
+				if result[0] == 'break':
+					break
+				if result[0] in ('return', 'throw'):
+					return result
+				if hasattr(s, 'counter'):
+					getValue(execute(s.counter, c), c)
+		return ('normal', v, None)
 	elif s.id == 'continue':
 		if s.first:
 			pass
