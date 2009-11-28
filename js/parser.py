@@ -150,12 +150,8 @@ symbol('(statements)'); symbol('(statement)')
 # special parse tokens
 symbol('(global)')
 symbol('(endline)'); symbol('(begin)'); symbol('(end)').reach = True
-symbol('(error)').reach = True
-
-symbol('<!'); symbol('</').reach = True
 
 symbol(')'); symbol(']'); symbol('}').reach = True
-symbol('"').reach = True; symbol("'").reach = True
 symbol(';'); symbol(':').reach = True
 
 @method(symbol(',', 10))
@@ -557,7 +553,7 @@ def advance(id='', t=None):
 	prevtoken, token = token, nexttoken
 	while 1:
 		nexttoken = len(lookahead) and lookahead.pop(0) or lexer.token()
-		if nexttoken.id == '(end)' or nexttoken.id == '(error)':
+		if nexttoken.id == '(end)':
 			return
 		if nexttoken.id != '(endline)':
 			break
