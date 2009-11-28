@@ -359,18 +359,14 @@ def nud(self):
 	if nexttoken.id == 'catch':
 		advance('catch')
 		advance('(')
-		if nexttoken.id != '(identifier)':
-			raise JavaScriptSyntaxError(
-				"Expected an identifier and instead saw '%s'." % nexttoken.value, nexttoken)
-		self.e = nexttoken
-		advance()
+		advance('(identifier)')
+		self.e = token
 		advance(')')
 		self.catchblock = block()
-		b = True
 	if nexttoken.id == 'finally':
 		advance('finally')
 		self.finallyblock = block()
-	elif not b:
+	elif not hasattr(self, 'catchblock'):
 		raise JavaScriptSyntaxError(
 			"Expected 'catch' and instead saw '%s'." % nexttoken.value, nexttoken)
 	return self
