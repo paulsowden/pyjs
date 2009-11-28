@@ -324,6 +324,9 @@ def function(s, is_decl=True):
 	s.params = functionparams()
 	s.functions = {}
 	s.vars = set()
+	s.labels = set()
+	s.iteration_depth = 0
+	s.switch_depth = 0
 	c, context = context, s
 	s.block = block()
 	context = c
@@ -377,7 +380,9 @@ def nud(self):
 	advance('(')
 	self.first = parse(5)
 	advance(')', t)
+	context.iteration_depth += 1
 	self.block = block()
+	context.iteration_depth -= 1
 	return self
 
 @method(stmt('with'))
@@ -397,6 +402,7 @@ def nud(self):
 	self.condition = parse(20)
 	advance(')', t)
 	t = nexttoken
+	context.switch_depth += 1
 	advance('{')
 	self.cases = []
 	while 1:
@@ -411,6 +417,7 @@ def nud(self):
 			advance(':')
 		elif nexttoken.id == '}':
 			advance('}', t)
+			context.switch_depth -= 1
 			return self
 		elif nexttoken.id == '(end)':
 			raise JavaScriptSyntaxError("Missing '}'.", nexttoken);
@@ -430,7 +437,9 @@ stmt('debugger')
 
 @method(stmt('do'))
 def nud(self):
+	context.iteration_depth += 1
 	self.block = block()
+	context.iteration_depth -= 1
 	advance('while')
 	t = nexttoken
 	advance('(')
@@ -488,20 +497,34 @@ def nud(self):
 				self.counter = symbol_table[','](
 					comma, self.counter, parse(0, 'for'))
 		advance(')', t)
+		context.iteration_depth += 1
 		self.block = block()
+		context.iteration_depth -= 1
 		return self
 
 @method(stmt('break'))
 def nud(self):
 	if nexttoken.identifier and token.lineno == nexttoken.lineno:
-		advance()
+		if nexttoken.value not in context.labels:
+			raise JavaScriptSyntaxError(
+				"Unrecognized label '%s'." % nexttoken.value, nexttoken)
+		advance('(identifier)')
 		self.first = token
+	elif not context.iteration_depth and not context.switch_depth:
+		raise JavaScriptSyntaxError(
+			"break outside of a loop or a switch", token)
 	return self
 
 @method(stmt('continue'))
 def nud(self):
+	if not context.iteration_depth:
+		raise JavaScriptSyntaxError(
+			"continue outside of a loop", token)
 	if nexttoken.identifier and token.lineno == nexttoken.lineno:
-		advance()
+		if nexttoken.value not in context.labels:
+			raise JavaScriptSyntaxError(
+				"Unrecognized label '%s'." % nexttoken.value, nexttoken)
+		advance('(identifier)')
 		self.first = token
 	return self
 
@@ -590,12 +613,20 @@ def statement():
 		return
 	s = symbol_table['(statement)']()
 	s.comments = t.comments
+	s.labels = set()
 	# Is this a labelled statement?
-	if t.identifier and not t.reserved and peek().id == ':':
-		advance()
+	while t.identifier and not t.reserved and peek().id == ':':
+		if t.value in context.labels:
+			raise JavaScriptSyntaxError(
+				"Duplicate label '%s'." % t.value, t)
+		context.labels.add(t.value)
+		s.labels.add(t)
+		advance('(identifier)')
 		advance(':')
 		t = nexttoken
 	s.first = parse(0, True)
+	for label in s.labels:
+		context.labels.remove(label.value)
 	if nexttoken.id == ';':
 		advance(';')
 	elif not nexttoken.reach and nexttoken.lineno == token.lineno:
@@ -642,6 +673,9 @@ def parse_str(js, filename=""):
 	context = symbol_table['(global)']()
 	context.functions = {}
 	context.vars = set()
+	context.labels = set()
+	context.iteration_depth = 0
+	context.switch_depth = 0
 
 	advance()
 	context.first = statements()
