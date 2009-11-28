@@ -78,7 +78,7 @@ def toRepr(value):
 def toObject(value, c):
 	prototype = lambda o: getattr(c.global_object, o)['prototype']
 	if value is None or value is null:
-		raise c.global_object.type_error.construct([], c)
+		raise JavaScriptException(c.global_object.type_error.construct([], c))
 	if isinstance(value, bool):
 		return JavaScriptBoolean(prototype('boolean'), value)
 	if isinstance(value, float):
@@ -118,18 +118,23 @@ class Reference(object):
 def getValue(v, c):
 	if isinstance(v, Reference):
 		if not v.base:
-			raise c.global_object.reference_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.reference_error.construct([], c))
 		return v.base[v.property_name]
 	return v
 
 def putValue(v, w, c):
 	if not isinstance(v, Reference):
-		raise c.global_object.reference_error.construct([], c)
+		raise JavaScriptException(
+			c.global_object.reference_error.construct([], c))
 	if not v.base:
 		c.global_object[v.property_name] = w
 	else:
 		v.base[v.property_name] = w
 
+class JavaScriptException(Exception):
+	def __init__(self, value):
+		self.value = value
 
 ## Native Objects
 
@@ -269,7 +274,7 @@ class JavaScriptFunction(JavaScriptObject):
 		c.instantiate_variables(self.symbol, activation)
 		v = execute(self.symbol.block, c)
 		if v[0] == 'throw':
-			raise v[1]
+			raise JavaScriptException(v[1])
 		if v[0] == 'return':
 			return v[1]
 		else: # normal
@@ -291,7 +296,8 @@ class JavaScriptFunction(JavaScriptObject):
 			return False
 		o = self['prototype']
 		if not isinstance(o, JavaScriptObject):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		while hasattr(v, 'prototype'):
 			v = v.prototype
 			if o == v:
@@ -360,7 +366,7 @@ class JavaScriptNativeFunction(JavaScriptFunction):
 	def call(self, this, args, c):
 		return self.fn(this, args, c)
 	def construct(self, this, args, c):
-		raise c.global_object.type_error.construct([], c)
+		raise JavaScriptException(c.global_object.type_error.construct([], c))
 
 class NativeFunctions(type):
 	def __new__(mcs, name, bases, dict):
@@ -440,7 +446,8 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 	@native(length=2)
 	def apply(this, args, c):
 		if not hasattr(this, 'call'):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		thisArg = args[0] if len(args) else None
 		thisArg = c.global_object \
 			if thisArg is None or thisArg is null else toObject(thisArg, c)
@@ -452,13 +459,15 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 		elif isinstance(argArray, JavaScriptArray):
 			argArray = [] # TODO
 		else:
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return this.call(thisArg, argArray, c)
 
 	@native(length=1)
 	def call(this, args, c):
 		if not hasattr(this, 'call'):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		thisArg = args[0] if len(args) else None
 		thisArg = c.global_object \
 			if thisArg is None or thisArg is null else toObject(thisArg, c)
@@ -470,7 +479,8 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isintance(this, JavaScriptArray):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		# TODO return join()
 
 	@native
@@ -523,13 +533,15 @@ class JavaScriptStringPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptString):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return this.value
 
 	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptString):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return this.value
 
 	@native(length=1)
@@ -631,13 +643,15 @@ class JavaScriptBooleanPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return toString(this.value)
 
 	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return this.value
 
 class JavaScriptNumberPrototype(JavaScriptNativePrototype):
@@ -1167,8 +1181,10 @@ class GlobalObject(JavaScriptObject):
 
 		error_prototype = self.error['prototype']
 		def put_error(attr, name):
-			self.put(name, JavaScriptNativeErrorConstructor(
-				name, error_prototype, function_prototype), dont_enum=True)
+			o = JavaScriptNativeErrorConstructor(
+				name, error_prototype, function_prototype)
+			setattr(self, attr, o)
+			self.put(name, o, dont_enum=True)
 		put_error('eval_error', 'EvalError')
 		put_error('range_error', 'RangeError')
 		put_error('reference_error', 'ReferenceError')
@@ -1241,8 +1257,8 @@ def execute(s, c):
 		for statement in s:
 			try:
 				v = execute(statement, c)
-			except JavaScriptObject, e:
-				return ('throw', e, None)
+			except JavaScriptException, e:
+				return ('throw', e.value, None)
 			if v[0] != 'normal':
 				return v
 		return v
@@ -1306,7 +1322,8 @@ def execute(s, c):
 		args = [getValue(execute(arg, c), c)
 			for arg in getattr(s, 'params', [])]
 		if typeof(l) != 'object' or not hasattr(l, 'construct'):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return l.construct(args, c)
 
 	elif s.id == '(':
@@ -1314,7 +1331,8 @@ def execute(s, c):
 		args = [getValue(execute(arg, c), c) for arg in s.params]
 		f = getValue(o, c)
 		if typeof(f) != 'object' or not hasattr(f, 'call'):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		this = o.base if isinstance(o, Reference) else None
 		if this and isinstance(this, Activation):
 			this = None
@@ -1392,15 +1410,18 @@ def execute(s, c):
 		l = getValue(execute(s.first, c), c)
 		r = getValue(execute(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		if not hasattr(r, 'has_instance'):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return r.has_instance(l, c)
 	elif s.id == 'in':
 		l = getValue(execute(s.first, c), c)
 		r = getValue(execute(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
-			raise c.global_object.type_error.construct([], c)
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
 		return toString(l) in r
 
 	## Equality Operators
@@ -1489,7 +1510,8 @@ def execute(s, c):
 			f = JavaScriptFunction(prototype, s, c.scope)
 		return f
 
-	raise RuntimeError, "unknown operation %s" % s.id
+	raise JavaScriptException(s.global_object.runtime_error.construct(
+		['unknown operation %s' % s.id], c))
 
 
 def run(symbol, global_object=None):
