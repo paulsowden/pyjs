@@ -118,10 +118,14 @@ def assignop(id):
 		self.second = parse(19)
 		return self
 
-def stmt(id, terminated=False):
+def stmt(id):
 	s = symbol(id)
 	s.identifier = s.reserved = True
-	s.terminated = terminated
+	return s
+
+def blockstmt(id):
+	s = stmt(id)
+	s.terminated = True
 	return s
 
 def method(s):
@@ -334,7 +338,7 @@ def function(s, is_decl=True):
 	s.block = block()
 	context = c
 
-@method(stmt('function', True))
+@method(blockstmt('function'))
 def fud(self):
 	function(self)
 	if nexttoken.id == '(' and nexttoken.lineno == token.lineno:
@@ -347,7 +351,7 @@ def nud(self):
 	function(self, False)
 	return self
 
-@method(stmt('if', True))
+@method(blockstmt('if'))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -359,7 +363,7 @@ def nud(self):
 		self.elseblock = block()
 	return self
 
-@method(stmt('try', True))
+@method(blockstmt('try'))
 def nud(self):
 	self.block = block()
 	if nexttoken.id == 'catch':
@@ -377,7 +381,7 @@ def nud(self):
 			"Expected 'catch' and instead saw '%s'." % nexttoken.value, nexttoken)
 	return self
 
-@method(stmt('while', True))
+@method(blockstmt('while'))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -388,7 +392,7 @@ def nud(self):
 	context.iteration_depth -= 1
 	return self
 
-@method(stmt('with', True))
+@method(blockstmt('with'))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -397,7 +401,7 @@ def nud(self):
 	self.block = block()
 	return self
 
-@method(stmt('switch', True))
+@method(blockstmt('switch'))
 def nud(self):
 	t = nexttoken
 	g = False
@@ -450,7 +454,7 @@ def nud(self):
 	advance(')', t)
 	return self
 
-@method(stmt('for', True))
+@method(blockstmt('for'))
 def nud(self):
 	t = nexttoken
 	advance('(')
