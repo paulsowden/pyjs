@@ -22,6 +22,7 @@ class Symbol(object):
 	reach = False
 	reserved = False
 	identifier = False
+	terminated = False
 
 	def __init__(self, replace_token=None, first=None, second=None):
 		if replace_token:
@@ -117,9 +118,10 @@ def assignop(id):
 		self.second = parse(19)
 		return self
 
-def stmt(id):
+def stmt(id, terminated=False):
 	s = symbol(id)
 	s.identifier = s.reserved = True
+	s.terminated = terminated
 	return s
 
 def method(s):
@@ -332,7 +334,7 @@ def function(s, is_decl=True):
 	s.block = block()
 	context = c
 
-@method(stmt('function'))
+@method(stmt('function', True))
 def fud(self):
 	function(self)
 	if nexttoken.id == '(' and nexttoken.lineno == token.lineno:
@@ -345,7 +347,7 @@ def nud(self):
 	function(self, False)
 	return self
 
-@method(stmt('if'))
+@method(stmt('if', True))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -357,7 +359,7 @@ def nud(self):
 		self.elseblock = block()
 	return self
 
-@method(stmt('try'))
+@method(stmt('try', True))
 def nud(self):
 	self.block = block()
 	if nexttoken.id == 'catch':
@@ -375,7 +377,7 @@ def nud(self):
 			"Expected 'catch' and instead saw '%s'." % nexttoken.value, nexttoken)
 	return self
 
-@method(stmt('while'))
+@method(stmt('while', True))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -386,7 +388,7 @@ def nud(self):
 	context.iteration_depth -= 1
 	return self
 
-@method(stmt('with'))
+@method(stmt('with', True))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -395,7 +397,7 @@ def nud(self):
 	self.block = block()
 	return self
 
-@method(stmt('switch'))
+@method(stmt('switch', True))
 def nud(self):
 	t = nexttoken
 	g = False
@@ -448,7 +450,7 @@ def nud(self):
 	advance(')', t)
 	return self
 
-@method(stmt('for'))
+@method(stmt('for', True))
 def nud(self):
 	t = nexttoken
 	advance('(')
@@ -628,7 +630,8 @@ def statement():
 		context.labels.remove(label.value)
 	if nexttoken.id == ';':
 		advance(';')
-	elif not nexttoken.reach and nexttoken.lineno == token.lineno:
+	elif not t.terminated and not nexttoken.reach \
+			and nexttoken.lineno == token.lineno:
 		raise JavaScriptSyntaxError(
 			"Missing ; before statement '%s'." % nexttoken.value, nexttoken)
 	return s
