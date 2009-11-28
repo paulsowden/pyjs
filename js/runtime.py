@@ -1,3 +1,4 @@
+import math, sys, random
 from math import isinf, isnan, copysign
 from parser import parse_str
 
@@ -999,30 +1000,30 @@ class JavaScriptNumberConstructor(JavaScriptFunction):
 			JavaScriptNumberPrototype(object_prototype, function_prototype),
 			True, True, True)
 		self['prototype'].put('constructor', self, dont_enum=True)
-
-		self.put('MAX_VALUE', 0, True, True, True) # TODO
-		self.put('MIN_VALUE', 0, True, True, True) # TODO
+		self.put('MAX_VALUE', sys.float_info.max, True, True, True)
+		self.put('MIN_VALUE', sys.float_info.min, True, True, True)
 		self.put('NaN', nan, True, True, True)
 		self.put('NEGATIVE_INFINITY', neginf, True, True, True)
 		self.put('POSITIVE_INFINITY', inf, True, True, True)
 	def call(self, this, args, c):
-		pass # TODO
+		return toNumber(args[0]) if len(args) else 0
 	def construct(self, args, c):
-		pass # TODO
+		return JavaScriptNumber(self['prototype'],
+			toNumber(args[0]) if len(args) else 0)
 
 class JavaScriptMath(JavaScriptObject):
 	name = 'Math'
 	def __init__(self, object_prototype, function_prototype):
 		JavaScriptObject.__init__(self, function_prototype)
 
-		self.put('E', 0, True, True, True) # TODO
-		self.put('LN10', 0, True, True, True) # TODO
-		self.put('LN2', 0, True, True, True) # TODO
-		self.put('LOG2E', 0, True, True, True) # TODO
-		self.put('LOG10E', 0, True, True, True) # TODO
-		self.put('PI', 0, True, True, True) # TODO
-		self.put('SQRT1_2', 0, True, True, True) # TODO
-		self.put('SQRT2', 0, True, True, True) # TODO
+		self.put('E', math.e, True, True, True)
+		self.put('LN10', math.log(10), True, True, True)
+		self.put('LN2', math.log(2), True, True, True)
+		self.put('LOG2E', math.log(math.e, 2), True, True, True)
+		self.put('LOG10E', math.log(math.e, 10), True, True, True)
+		self.put('PI', math.pi, True, True, True)
+		self.put('SQRT1_2', math.sqrt(0.5), True, True, True)
+		self.put('SQRT2', math.sqrt(2), True, True, True)
 
 		self.JavaScriptMathFunctions().bind(self, function_prototype)
 
@@ -1031,75 +1032,77 @@ class JavaScriptMath(JavaScriptObject):
 
 		@native(length=1)
 		def abs(this, args, c):
-			pass # TODO
+			return math.fabs(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def acos(this, args, c):
-			pass # TODO
+			return math.acos(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def asin(this, args, c):
-			pass # TODO
+			return math.asin(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def atan(this, args, c):
-			pass # TODO
+			return math.atan(toNumber(args[0] if len(args) else None))
 
 		@native(length=2)
 		def atan2(this, args, c):
-			pass # TODO
+			return math.atan2(toNumber(args[0] if len(args) else None),
+				toNumber(args[1] if len(args) > 1 else None))
 
 		@native(length=1)
 		def ceil(this, args, c):
-			pass # TODO
+			return math.ceil(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def cos(this, args, c):
-			pass # TODO
+			return math.cos(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def exp(this, args, c):
-			pass # TODO
+			return math.exp(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def floor(this, args, c):
-			pass # TODO
+			return math.floor(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def log(this, args, c):
-			pass # TODO
+			return math.log(toNumber(args[0] if len(args) else None))
 
 		@native(length=2)
 		def max(this, args, c):
-			pass # TODO
+			return max(toNumber(arg) for arg in args) if len(args) else nan
 
 		@native(length=2)
 		def min(this, args, c):
-			pass # TODO
+			return min(toNumber(arg) for arg in args) if len(args) else nan
 
 		@native(length=2)
 		def pow(this, args, c):
-			pass # TODO
+			return math.pow(toNumber(arg[0] if len(args) else None),
+				toNumber(arg[1] if len(args) > 1 else None))
 
 		@native
 		def random(this, args, c):
-			pass # TODO
+			return random.random()
 
 		@native(length=1)
 		def round(this, args, c):
-			pass # TODO
+			return round(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def sin(this, args, c):
-			pass # TODO
+			return math.sin(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def sqrt(this, args, c):
-			pass # TODO
+			return math.sqrt(toNumber(args[0] if len(args) else None))
 
 		@native(length=1)
 		def tan(this, args, c):
-			pass # TODO
+			return math.tan(toNumber(args[0] if len(args) else None))
 
 class JavaScriptDateConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
