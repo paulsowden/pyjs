@@ -886,7 +886,7 @@ class JavaScriptObjectConstructor(JavaScriptFunction):
 		JavaScriptObject.__init__(self, function_prototype)
 		self.put('length', 1, True, True, True)
 		self.put('prototype', prototype, True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 		prototype.bind(prototype, function_prototype)
 	def call(self, this, args, c):
 		o = args[0] if len(args) else JavaScriptObject(self['prototype'])
@@ -898,7 +898,7 @@ class JavaScriptFunctionConstructor(JavaScriptFunction):
 		JavaScriptObject.__init__(self, function_prototype)
 		self.put('length', 1, True, True, True)
 		self.put('prototype', function_prototype, True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 		function_prototype.bind(function_prototype, function_prototype)
 	def call(self, this, args, c):
 		pass # TODO
@@ -912,7 +912,7 @@ class JavaScriptArrayConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptArrayPrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 	def call(self, this, args, s):
 		return self.construct(args, s)
 	def construct(self, args, s):
@@ -930,7 +930,7 @@ class JavaScriptStringConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptStringPrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 		self.JavaScriptStringFunctions().bind(self, function_prototype)
 	def call(self, this, args, c):
 		return toString(args[0]) if len(args) else ''
@@ -952,7 +952,7 @@ class JavaScriptBooleanConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptBooleanPrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 	def call(self, this, args, c):
 		return toBoolean(args[0]) if len(args) else False
 	def construct(self, args, c):
@@ -966,7 +966,7 @@ class JavaScriptNumberConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptNumberPrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 
 		self.put('MAX_VALUE', 0, True, True, True) # TODO
 		self.put('MIN_VALUE', 0, True, True, True) # TODO
@@ -1076,7 +1076,7 @@ class JavaScriptDateConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptDatePrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 		self.JavaScriptDateFunctions().bind(self, function_prototype)
 	def call(self, this, args, c):
 		pass # TODO
@@ -1101,7 +1101,7 @@ class JavaScriptRegExpConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptRegExpPrototype(object_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 	def call(self, this, args, c):
 		pass # TODO
 	def construct(self, args, c):
@@ -1114,7 +1114,7 @@ class JavaScriptErrorConstructor(JavaScriptFunction):
 		self.put('prototype',
 			JavaScriptErrorPrototype(self, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 	def call(self, this, args, c):
 		return self.construct(args, c)
 	def construct(self, args, c):
@@ -1132,7 +1132,7 @@ class JavaScriptNativeErrorConstructor(JavaScriptErrorConstructor):
 			JavaScriptNativeErrorPrototype(
 				name, error_prototype, function_prototype),
 			True, True, True)
-		self['prototype']['constructor'] = self
+		self['prototype'].put('constructor', self, dont_enum=True)
 	def construct(self, args, c):
 		error = JavaScriptNativeError(self.name, self['prototype'])
 		if len(args) and args[0] != None:
