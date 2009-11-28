@@ -92,9 +92,18 @@ def lessThan(x, y):
 	x, y = toPrimitive(x, 'number'), toPrimitive(y, 'number')
 	if typeof(x) != 'string' or typeof(y) != 'string':
 		x, y = toNumber(x), toNumber(y)
+		if isnan(x) or isnan(y):
+			return None
 		if x == y:
 			return False
-		# TODO NaN, Infinity checks
+		if x == inf:
+			return False
+		if y == inf:
+			return True
+		if x == neginf:
+			return False
+		if y == neginf:
+			return True
 		return x < y
 	# string comparison
 	if x.startswith(y):
@@ -1408,25 +1417,21 @@ def execute(s, c):
 
 	## Relational Operators
 	elif s.id == '<':
-		r = lessThan(getValue(execute(s.first, c), c), getValue(execute(s.second, c), c))
-		if r == None:
-			return False
-		return r
+		r = lessThan(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
+		return False if r == None else r
 	elif s.id == '>':
-		r = lessThan(getValue(execute(s.second, c), c), getValue(execute(s.first, c), c))
-		if r == None:
-			return False
-		return r
+		r = lessThan(getValue(execute(s.second, c), c),
+			getValue(execute(s.first, c), c))
+		return False if r == None else r
 	elif s.id == '<=':
-		r = lessThan(getValue(execute(s.second, c), c), getValue(execute(s.first, c), c))
-		if r == None:
-			return False
-		return not r
+		r = lessThan(getValue(execute(s.second, c), c),
+			getValue(execute(s.first, c), c))
+		return False if r == None else not r
 	elif s.id == '>=':
-		r = lessThan(getValue(execute(s.first, c), c), getValue(execute(s.second, c), c))
-		if r == None:
-			return False
-		return not r
+		r = lessThan(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
+		return False if r == None else not r
 	elif s.id == 'instanceof':
 		l = getValue(execute(s.first, c), c)
 		r = getValue(execute(s.second, c), c)
