@@ -1459,6 +1459,8 @@ def execute(s, c):
 	elif s.id == '(statement)':
 		v = execute(s.first, c)
 		if isinstance(v, tuple):
+			if v[0] == 'break' and v[2] in set(l.value for l in s.labels):
+				return ('normal', v[1], None)
 			return v
 		else:
 			return ('normal', getValue(v, c), None)
@@ -1480,9 +1482,11 @@ def execute(s, c):
 		t = True
 		while t:
 			v = execute(s.block, c)
-			if v[0] == 'continue' and v[2]:
-				return # TODO GOTO
-			elif v[0] == 'break' and v[2]:
+			if v[0] == 'continue' and \
+					(not v[2] or v[2] in set(l.value for l in s.labels)):
+				pass
+			elif v[0] == 'break' and \
+					(not v[2] or v[2] in set(l.value for l in s.labels)):
 				return ('normal', v[1], None)
 			elif v[0] != 'normal':
 				return v
@@ -1493,9 +1497,11 @@ def execute(s, c):
 		v = None
 		while toBoolean(getValue(execute(s.second, c), c)):
 			v = execute(s.block, c)
-			if v[0] == 'continue' and v[2]:
-				return # TODO GOTO
-			elif v[0] == 'break' and v[2]:
+			if v[0] == 'continue' and \
+					(not v[2] or v[2] in set(l.value for l in s.labels)):
+				pass
+			elif v[0] == 'break' and \
+					(not v[2] or v[2] in set(l.value for l in s.labels)):
 				return ('normal', v[1], None)
 			elif v[0] != 'normal':
 				return v
@@ -1512,11 +1518,13 @@ def execute(s, c):
 				putValue(execute(identifier, c), key, c)
 				result = execute(s.block, c)
 				v = result[1]
-				if result[0] == 'break':
+				if result[0] == 'break' and (not result[2] or \
+						result[2] in set(l.value for l in s.labels)):
 					break
-				if result[0] == 'continue': # TODO label
+				if result[0] == 'continue' and (not result[2] or \
+						result[2] in set(l.value for l in s.labels)):
 					continue
-				if result[0] in ('return', 'throw'):
+				if result[0] != 'normal':
 					return result
 		else:
 			if hasattr(s, 'initializer'):
@@ -1529,23 +1537,23 @@ def execute(s, c):
 					break
 				result = execute(s.block, c)
 				v = result[1]
-				if result[0] == 'break':
+				if result[0] == 'break' and (not result[2] or \
+						result[2] in set(l.value for l in s.labels)):
 					break
-				if result[0] in ('return', 'throw'):
+				if result[0] == 'continue' and (not result[2] or \
+						result[2] in set(l.value for l in s.labels)):
+					pass
+				elif result[0] != 'normal':
 					return result
 				if hasattr(s, 'counter'):
 					getValue(execute(s.counter, c), c)
 		return ('normal', v, None)
 	elif s.id == 'continue':
-		if s.first:
-			pass
+		return ('continue', None, s.first.value if s.first else None)
 	elif s.id == 'break':
-		if s.first:
-			pass
+		return ('break', None, s.first.value if s.first else None)
 	elif s.id == 'return':
-		if not s.first:
-			return ('return', None, None)
-		return ('return', execute(s.first, c), None)
+		return ('return', execute(s.first, c) if s.first else None, None)
 	elif s.id == 'with':
 		c.scope = Scope(c.scope, toObject(getValue(execute(s.first, c), c), c))
 		try:
