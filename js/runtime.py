@@ -1544,17 +1544,35 @@ def execute(s, c):
 			return ('return', None, None)
 		return ('return', execute(s.first, c), None)
 	elif s.id == 'with':
-		pass
+		c.scope = Scope(c.scope, toObject(getValue(execute(s.first, c), c), c))
+		try:
+			r = execute(s.block, c)
+		except JavaScriptException, e:
+			r = ('throw', e.value, None)
+		c.scope = c.scope.parent
+		return r
 	elif s.id == 'switch':
 		pass
 	elif s.id == 'throw':
-		pass
+		return ('throw', getValue(execute(s.first, c)), None)
 	elif s.id == 'try':
-		pass
+		result = execute(s.block, c)
+		if result[0] == 'throw' and hasattr(s, 'catchblock'):
+			c.scope = Scope(c.scope, c.global_object.object.construct([], c))
+			c.scope.object.put(s.e.value, result[1], dont_delete=True)
+			r = execute(s.catchblock, c)
+			c.scope = c.scope.parent
+			if not hasattr(s, 'finallyblock') or r[0] != 'normal':
+				result = r
+		if hasattr(s, 'finallyblock'):
+			r = execute(s.finallyblock, c)
+			if not hasattr(s, 'catchblock') or r[0] != 'normal':
+				result = r
+		return result
 	elif s.id == 'function':
 		prototype = c.global_object.function['prototype']
 		if not s.is_decl and s.name:
-			scope = Scope(c.scope)
+			scope = Scope(c.scope, c.global_object.object.construct([], c))
 			f = JavaScriptFunction(prototype, s, scope)
 			scope.object.put(s.name.value, f, dont_delete=True, read_only=True)
 		else:
