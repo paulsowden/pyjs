@@ -601,6 +601,9 @@ def statement():
 	s.first = parse(0, True)
 	if nexttoken.id == ';':
 		advance(';')
+	elif not nexttoken.reach and nexttoken.lineno == token.lineno:
+		raise JavaScriptSyntaxError(
+			"Missing ; before statement '%s'." % nexttoken.value, nexttoken)
 	return s
 
 def statements():
