@@ -199,7 +199,8 @@ suffix('--'); prefix('--')
 
 prefix('delete', 0)
 
-prefix('~'); prefix('!'); prefix('typeof')
+prefix('~'); prefix('!');
+prefix('typeof'); prefix('void')
 
 @method(prefix('new', 155))
 def nud(self):
@@ -540,8 +541,6 @@ def nud(self):
 def nud(self):
 	self.first = parse(19)
 	return self
-
-reserve('void')
 
 # Superfluous reserved words
 map(reserve,
