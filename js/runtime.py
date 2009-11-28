@@ -1595,7 +1595,7 @@ def execute(s, c):
 			f = JavaScriptFunction(prototype, s, c.scope)
 		return f
 
-	raise JavaScriptException(s.global_object.runtime_error.construct(
+	raise JavaScriptException(c.global_object.error.construct(
 		['unknown operation %s' % s.id], c))
 
 
