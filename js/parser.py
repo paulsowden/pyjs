@@ -503,7 +503,6 @@ def nud(self):
 	if nexttoken.identifier and token.lineno == nexttoken.lineno:
 		advance()
 		self.first = token
-	#reachable('break')
 	return self
 
 @method(stmt('continue'))
@@ -511,7 +510,6 @@ def nud(self):
 	if nexttoken.identifier and token.lineno == nexttoken.lineno:
 		advance()
 		self.first = token
-	#reachable('continue')
 	return self
 
 @method(stmt('return'))
@@ -520,13 +518,11 @@ def nud(self):
 		raise JavaScriptSyntaxError("return declared in the global scope.", token)
 	if nexttoken.id != ';' and not nexttoken.reach:
 		self.first = parse(19)
-	#reachable('return')
 	return self
 
 @method(stmt('throw'))
 def nud(self):
 	self.first = parse(19)
-	#reachable('throw')
 	return self
 
 reserve('void')
