@@ -355,7 +355,7 @@ class JavaScriptNativeFunctionWrapper(object):
 class JavaScriptNativeFunction(JavaScriptFunction):
 	def __init__(self, prototype, wrapper):
 		JavaScriptObject.__init__(self, prototype)
-		self.fn = wrapper.funtion
+		self.fn = wrapper.function
 		self.put('length', wrapper.length, True, True, True)
 	def call(self, this, args, c):
 		return self.fn(this, args, c)
