@@ -337,16 +337,16 @@ class JavaScriptRegExp(JavaScriptObject):
 ## Builtin Prototypes
 
 class JavaScriptNativeFunctionWrapper(object):
-	def __init__(self, fn, length, name):
-		self.fn = fn
+	def __init__(self, funtion, length, name):
+		self.function = funtion
 		self.length = length
 		self.name = name
 
 class JavaScriptNativeFunction(JavaScriptFunction):
-	def __init__(self, prototype, native_function):
+	def __init__(self, prototype, wrapper):
 		JavaScriptObject.__init__(self, prototype)
-		self.fn = native_function.fn
-		self.put('length', native_function.length, True, True, True)
+		self.fn = wrapper.funtion
+		self.put('length', wrapper.length, True, True, True)
 	def call(self, this, args, c):
 		return self.fn(this, args, c)
 	def construct(self, this, args, c):
