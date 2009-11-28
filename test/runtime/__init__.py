@@ -1,7 +1,7 @@
 
 import unittest
 
-import function, if_, delete, string, globals
+import function, if_, delete, string, globals, for_
 
 def suite():
 	suite = unittest.TestSuite([
@@ -10,6 +10,7 @@ def suite():
 		delete.suite(),
 		string.suite(),
 		globals.suite(),
+		for_.suite(),
 		])
 	return suite
 
