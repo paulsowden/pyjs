@@ -78,7 +78,7 @@ def toRepr(value):
 def toObject(value, c):
 	prototype = lambda o: getattr(c.global_object, o)['prototype']
 	if value is None or value is null:
-		raise JavaScriptTypeError() # TODO prototype
+		raise c.global_object.type_error.construct([], c)
 	if isinstance(value, bool):
 		return JavaScriptBoolean(prototype('boolean'), value)
 	if isinstance(value, float):
@@ -115,16 +115,16 @@ class Reference(object):
 	def __repr__(self):
 		return '<Reference %s %s>' % (self.base, self.property_name)
 
-def getValue(v):
+def getValue(v, c):
 	if isinstance(v, Reference):
 		if not v.base:
-			raise JavaScriptReferenceError()
+			raise c.global_object.reference_error.construct([], c)
 		return v.base[v.property_name]
 	return v
 
 def putValue(v, w, c):
 	if not isinstance(v, Reference):
-		raise JavaScriptReferenceError()
+		raise c.global_object.reference_error.construct([], c)
 	if not v.base:
 		c.global_object[v.property_name] = w
 	else:
@@ -286,12 +286,12 @@ class JavaScriptFunction(JavaScriptObject):
 			return v
 		return o
 
-	def has_instance(self, v):
+	def has_instance(self, v, c):
 		if not isinstance(v, JavaScriptObject):
 			return False
 		o = self['prototype']
 		if not isinstance(o, JavaScriptObject):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		while hasattr(v, 'prototype'):
 			v = v.prototype
 			if o == v:
@@ -333,8 +333,18 @@ class JavaScriptRegExp(JavaScriptObject):
 		self.put('multiline', False, True, True, True) # TODO
 		self.put('lastIndex', 0, dont_delete=True, dont_enum=True) # TODO
 
+class JavaScriptError(JavaScriptObject):
+	name = 'Error'
+	def __str__(self):
+		return '%s: %s' % (self.name, toString(self['message']))
 
-## Builtin Prototypes
+class JavaScriptNativeError(JavaScriptError):
+	def __init__(self, name, prototype):
+		super(JavaScriptNativeError, self).__init__(prototype)
+		self.name = name
+
+
+## Native Prototypes
 
 class JavaScriptNativeFunctionWrapper(object):
 	def __init__(self, funtion, length, name):
@@ -350,7 +360,7 @@ class JavaScriptNativeFunction(JavaScriptFunction):
 	def call(self, this, args, c):
 		return self.fn(this, args, c)
 	def construct(self, this, args, c):
-		raise JavaScriptTypeError()
+		raise c.global_object.type_error.construct([], c)
 
 class NativeFunctions(type):
 	def __new__(mcs, name, bases, dict):
@@ -430,7 +440,7 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 	@native(length=2)
 	def apply(this, args, c):
 		if not hasattr(this, 'call'):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		thisArg = args[0] if len(args) else None
 		thisArg = c.global_object \
 			if thisArg is None or thisArg is null else toObject(thisArg, c)
@@ -442,13 +452,13 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 		elif isinstance(argArray, JavaScriptArray):
 			argArray = [] # TODO
 		else:
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return this.call(thisArg, argArray, c)
 
 	@native(length=1)
 	def call(this, args, c):
 		if not hasattr(this, 'call'):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		thisArg = args[0] if len(args) else None
 		thisArg = c.global_object \
 			if thisArg is None or thisArg is null else toObject(thisArg, c)
@@ -460,7 +470,7 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isintance(this, JavaScriptArray):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		# TODO return join()
 
 	@native
@@ -513,13 +523,13 @@ class JavaScriptStringPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptString):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return this.value
 
 	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptString):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return this.value
 
 	@native(length=1)
@@ -621,13 +631,13 @@ class JavaScriptBooleanPrototype(JavaScriptNativePrototype):
 	@native
 	def toString(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return toString(this.value)
 
 	@native
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptBoolean):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return this.value
 
 class JavaScriptNumberPrototype(JavaScriptNativePrototype):
@@ -847,33 +857,29 @@ class JavaScriptRegExpPrototype(JavaScriptNativePrototype):
 	def toString(this, args, c):
 		pass # TODO
 
-## Errors
+class JavaScriptErrorPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
 
-class JavaScriptError(JavaScriptObject):
-	name = 'Error'
-	def __str__(self):
-		return '%s: %s' % (self.name, toString(self['message']))
+	def __init__(self, *args, **kwargs):
+		super(JavaScriptErrorPrototype, self).__init__(*args, **kwargs)
+		self['name'] = 'Error'
+		self['message'] = 'Unknown Error'
 
-class JavaScriptEvalError(JavaScriptError):
-	name = 'EvalError'
+	@native
+	def toString(this, args, c):
+		#message = isinstance(this, JavaScriptObject) and this['message']
+		return this.name if isinstance(this, JavaScriptError) else 'Error'
 
-class JavaScriptRangeError(JavaScriptError):
-	name = 'RangeError'
+class JavaScriptNativeErrorPrototype(JavaScriptNativePrototype):
+	__metaclass__ = NativeFunctions
 
-class JavaScriptReferenceError(JavaScriptError):
-	name = 'ReferenceError'
-
-class JavaScriptSyntaxError(JavaScriptError):
-	name = 'SyntaxError'
-
-class JavaScriptTypeError(JavaScriptError):
-	name = 'TypeError'
-
-class JavaScriptURIError(JavaScriptError):
-	name = 'URIError'
+	def __init__(self, name, *args, **kwargs):
+		super(JavaScriptNativeErrorPrototype, self).__init__(*args, **kwargs)
+		self['name'] = name
+		self['message'] = 'Unknown Error'
 
 
-## Global Scope
+## Object Constructors
 
 class JavaScriptObjectConstructor(JavaScriptFunction):
 	def __init__(self, prototype, function_prototype):
@@ -1101,6 +1107,41 @@ class JavaScriptRegExpConstructor(JavaScriptFunction):
 	def construct(self, args, c):
 		pass # TODO
 
+class JavaScriptErrorConstructor(JavaScriptFunction):
+	def __init__(self, object_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.put('length', 1, True, True, True)
+		self.put('prototype',
+			JavaScriptErrorPrototype(self, function_prototype),
+			True, True, True)
+		self['prototype']['constructor'] = self
+	def call(self, this, args, c):
+		return self.construct(args, c)
+	def construct(self, args, c):
+		error = JavaScriptError(self['prototype'])
+		if len(args) and args[0] != None:
+			error['message'] = toString(args[0])
+		return error
+
+class JavaScriptNativeErrorConstructor(JavaScriptErrorConstructor):
+	def __init__(self, name, error_prototype, function_prototype):
+		JavaScriptObject.__init__(self, function_prototype)
+		self.name = name
+		self.put('length', 1, True, True, True)
+		self.put('prototype',
+			JavaScriptNativeErrorPrototype(
+				name, error_prototype, function_prototype),
+			True, True, True)
+		self['prototype']['constructor'] = self
+	def construct(self, args, c):
+		error = JavaScriptNativeError(self.name, self['prototype'])
+		if len(args) and args[0] != None:
+			error['message'] = toString(args[0])
+		return error
+
+
+## Global Object
+
 class GlobalObject(JavaScriptObject):
 	def __init__(self):
 		super(GlobalObject, self).__init__()
@@ -1122,6 +1163,18 @@ class GlobalObject(JavaScriptObject):
 		put('math', 'Math', JavaScriptMath)
 		put('date', 'Date', JavaScriptDateConstructor)
 		put('regexp', 'RegExp', JavaScriptRegExpConstructor)
+		put('error', 'Error', JavaScriptErrorConstructor)
+
+		error_prototype = self.error['prototype']
+		def put_error(attr, name):
+			self.put(name, JavaScriptNativeErrorConstructor(
+				name, error_prototype, function_prototype), dont_enum=True)
+		put_error('eval_error', 'EvalError')
+		put_error('range_error', 'RangeError')
+		put_error('reference_error', 'ReferenceError')
+		put_error('syntax_error', 'SyntaxError')
+		put_error('type_error', 'TypeError')
+		put_error('uri_error', 'URIError')
 
 		self.put('Function', self.function, dont_enum=True)
 
@@ -1233,7 +1286,7 @@ def execute(s, c):
 				key = toString(execute(k, c))
 			else: # (string)
 				key = execute(k, c)
-			o[key] = getValue(execute(v, c))
+			o[key] = getValue(execute(v, c), c)
 		return o
 
 
@@ -1241,26 +1294,27 @@ def execute(s, c):
 
 	elif s.id == '.':
 		return Reference(
-			toObject(getValue(execute(s.first, c)), c),
+			toObject(getValue(execute(s.first, c), c), c),
 			s.second.value)
 	elif s.id == '[': # property
-		l = getValue(execute(s.first, c))
-		r = getValue(execute(s.second, c))
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
 		return Reference(toObject(l, c), toString(r))
 
 	elif s.id == 'new':
-		l = getValue(execute(s.first, c))
-		args = [getValue(execute(arg, c)) for arg in getattr(s, 'params', [])]
+		l = getValue(execute(s.first, c), c)
+		args = [getValue(execute(arg, c), c)
+			for arg in getattr(s, 'params', [])]
 		if typeof(l) != 'object' or not hasattr(l, 'construct'):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return l.construct(args, c)
 
 	elif s.id == '(':
 		o = execute(s.first, c)
-		args = [getValue(execute(arg, c)) for arg in s.params]
-		f = getValue(o)
+		args = [getValue(execute(arg, c), c) for arg in s.params]
+		f = getValue(o, c)
 		if typeof(f) != 'object' or not hasattr(f, 'call'):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		this = o.base if isinstance(o, Reference) else None
 		if this and isinstance(this, Activation):
 			this = None
@@ -1271,13 +1325,13 @@ def execute(s, c):
 		l = execute(s.first, c)
 		if isinstance(l, Reference) and l.base == None:
 			return 'undefined'
-		o = getValue(l)
+		o = getValue(l, c)
 		type = typeof(o)
 		if type == 'object' and hasattr(o, 'call'):
 			return 'function'
 		return type
 	elif s.id == 'void':
-		l = getValue(execute(s.first, c))
+		l = getValue(execute(s.first, c), c)
 		return None
 	elif s.id == 'delete':
 		l = execute(s.first, c)
@@ -1285,68 +1339,68 @@ def execute(s, c):
 			return True
 		return l.base.__delitem__(l.property_name)
 	elif s.id == '+' and hasattr(s, 'arity'): # unary
-		return toNumber(getValue(execute(s.first, c)))
+		return toNumber(getValue(execute(s.first, c), c))
 	elif s.id == '-' and hasattr(s, 'arity'): # unary
-		return -toNumber(getValue(execute(s.first, c)))
+		return -toNumber(getValue(execute(s.first, c), c))
 	elif s.id == '~':
 		pass
 	elif s.id == '!':
-		return not toBoolean(getValue(execute(s.first, c)))
+		return not toBoolean(getValue(execute(s.first, c), c))
 
 	elif s.id == '=':
 		l = execute(s.first, c)
-		r = getValue(execute(s.second, c))
+		r = getValue(execute(s.second, c), c)
 		putValue(l, r, c)
 		return r
 
 	## Multiplicative Operators
 	elif s.id == '/':
-		return toNumber(getValue(execute(s.first, c))) / toNumber(getValue(execute(s.second, c)))
+		return toNumber(getValue(execute(s.first, c), c)) / toNumber(getValue(execute(s.second, c), c))
 	elif s.id == '*':
-		return toNumber(getValue(execute(s.first, c))) * toNumber(getValue(execute(s.second, c)))
+		return toNumber(getValue(execute(s.first, c), c)) * toNumber(getValue(execute(s.second, c), c))
 	elif s.id == '%':
-		return toNumber(getValue(execute(s.first, c))) % toNumber(getValue(execute(s.second, c)))
+		return toNumber(getValue(execute(s.first, c), c)) % toNumber(getValue(execute(s.second, c), c))
 
 	## Additive Operators
 	elif s.id == '+':
-		return getValue(execute(s.first, c)) + getValue(execute(s.second, c))
+		return getValue(execute(s.first, c), c) + getValue(execute(s.second, c), c)
 	elif s.id == '-':
-		return getValue(execute(s.first, c)) - getValue(execute(s.second, c))
+		return getValue(execute(s.first, c), c) - getValue(execute(s.second, c), c)
 
 	## Relational Operators
 	elif s.id == '<':
-		r = lessThan(getValue(execute(s.first, c)), getValue(execute(s.second, c)))
+		r = lessThan(getValue(execute(s.first, c), c), getValue(execute(s.second, c), c))
 		if r == None:
 			return False
 		return r
 	elif s.id == '>':
-		r = lessThan(getValue(execute(s.second, c)), getValue(execute(s.first, c)))
+		r = lessThan(getValue(execute(s.second, c), c), getValue(execute(s.first, c), c))
 		if r == None:
 			return False
 		return r
 	elif s.id == '<=':
-		r = lessThan(getValue(execute(s.second, c)), getValue(execute(s.first, c)))
+		r = lessThan(getValue(execute(s.second, c), c), getValue(execute(s.first, c), c))
 		if r == None:
 			return False
 		return not r
 	elif s.id == '>=':
-		r = lessThan(getValue(execute(s.first, c)), getValue(execute(s.second, c)))
+		r = lessThan(getValue(execute(s.first, c), c), getValue(execute(s.second, c), c))
 		if r == None:
 			return False
 		return not r
 	elif s.id == 'instanceof':
-		l = getValue(execute(s.first, c))
-		r = getValue(execute(s.second, c))
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		if not hasattr(r, 'has_instance'):
-			raise JavaScriptTypeError()
-		return r.has_instance(l)
+			raise c.global_object.type_error.construct([], c)
+		return r.has_instance(l, c)
 	elif s.id == 'in':
-		l = getValue(execute(s.first, c))
-		r = getValue(execute(s.second, c))
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
-			raise JavaScriptTypeError()
+			raise c.global_object.type_error.construct([], c)
 		return toString(l) in r
 
 	## Equality Operators
@@ -1373,7 +1427,7 @@ def execute(s, c):
 		return ('normal', None, None)
 
 	elif s.id == 'if':
-		if toBoolean(getValue(execute(s.first, c))):
+		if toBoolean(getValue(execute(s.first, c), c)):
 			return execute(s.block, c)
 		elif hasattr(s, 'elseblock'):
 			return execute(s.elseblock, c)
@@ -1390,12 +1444,12 @@ def execute(s, c):
 				return ('normal', v[1], None)
 			elif v[0] != 'normal':
 				return v
-			t = toBoolean(getValue(execute(s.second, c)))
+			t = toBoolean(getValue(execute(s.second, c), c))
 		return ('normal', v[1], None)
 
 	elif s.id == 'while':
 		v = None
-		while toBoolean(getValue(execute(s.second, c))):
+		while toBoolean(getValue(execute(s.second, c), c)):
 			v = execute(s.block, c)
 			if v[0] == 'continue' and v[2]:
 				return # TODO GOTO
@@ -1445,6 +1499,6 @@ def run(symbol, global_object=None):
 	c = ExecutionContext(Scope(object=global_object),
 		global_object, global_object)
 	c.instantiate_variables(symbol, global_object)
-	return getValue(execute(symbol.first, c)[1])
+	return getValue(execute(symbol.first, c)[1], c)
 
 
