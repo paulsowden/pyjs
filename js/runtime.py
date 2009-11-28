@@ -1440,7 +1440,7 @@ def execute(s, c):
 		if isinstance(v, tuple):
 			return v
 		else:
-			return ('normal', v, None)
+			return ('normal', getValue(v, c), None)
 	elif s.id == 'var':
 		for var in s.first:
 			if var.id == '(identifier)': continue
@@ -1521,6 +1521,6 @@ def run(symbol, global_object=None):
 	c = ExecutionContext(Scope(object=global_object),
 		global_object, global_object)
 	c.instantiate_variables(symbol, global_object)
-	return getValue(execute(symbol.first, c)[1], c)
+	return execute(symbol.first, c)[1]
 
 
