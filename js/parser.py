@@ -152,7 +152,7 @@ type('(object)')
 
 symbol('(identifier)').nud = lambda self: self
 
-symbol('(statements)'); symbol('(statement)')
+symbol('(statement)')
 
 # special parse tokens
 symbol('(global)')
