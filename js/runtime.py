@@ -1408,6 +1408,16 @@ def execute(s, c):
 			this = None
 		return f.call(this, args, c)
 
+	## Postfix Expressions
+	elif s.id == '++':
+		if hasatter(s, 'arity'):
+			pass
+		# TODO
+	elif s.id == '--':
+		if hasatter(s, 'arity'):
+			pass
+		# TODO
+
 	## Unary Operators
 	elif s.id == 'typeof':
 		l = execute(s.first, c)
@@ -1431,15 +1441,9 @@ def execute(s, c):
 	elif s.id == '-' and hasattr(s, 'arity'): # unary
 		return -toNumber(getValue(execute(s.first, c), c))
 	elif s.id == '~':
-		pass
+		pass # TODO
 	elif s.id == '!':
 		return not toBoolean(getValue(execute(s.first, c), c))
-
-	elif s.id == '=':
-		l = execute(s.first, c)
-		r = getValue(execute(s.second, c), c)
-		putValue(l, r, c)
-		return r
 
 	## Multiplicative Operators
 	elif s.id == '/':
@@ -1454,6 +1458,14 @@ def execute(s, c):
 		return getValue(execute(s.first, c), c) + getValue(execute(s.second, c), c)
 	elif s.id == '-':
 		return getValue(execute(s.first, c), c) - getValue(execute(s.second, c), c)
+
+	## Bitwise Shift Operators
+	elif s.id == '<<':
+		pass # TODO
+	elif s.id == '>>':
+		pass # TODO
+	elif s.id == '>>>':
+		pass # TODO
 
 	## Relational Operators
 	elif s.id == '<':
@@ -1492,13 +1504,64 @@ def execute(s, c):
 
 	## Equality Operators
 	elif s.id == '==':
-		pass
+		pass # TODO
 	elif s.id == '!=':
-		pass
+		pass # TODO
 	elif s.id == '===':
-		pass
+		pass # TODO
 	elif s.id == '!==':
-		pass
+		pass # TODO
+
+	## Binary Bitwise Operators
+	elif s.id == '&':
+		pass # TODO
+	elif s.id == '^':
+		pass # TODO
+	elif s.id == '|':
+		pass # TODO
+
+	## Binary Logical Operators
+	elif s.id == '&&':
+		pass # TODO
+	elif s.id == '||':
+		pass # TODO
+
+	## Conditional Operator
+	elif s.id == '?':
+		pass # TODO
+
+	## Assignment Operators
+	elif s.id == '=':
+		l = execute(s.first, c)
+		r = getValue(execute(s.second, c), c)
+		putValue(l, r, c)
+		return r
+	elif s.id == '*=':
+		pass # TODO
+	elif s.id == '/=':
+		pass # TODO
+	elif s.id == '%=':
+		pass # TODO
+	elif s.id == '+=':
+		pass # TODO
+	elif s.id == '-=':
+		pass # TODO
+	elif s.id == '<<=':
+		pass # TODO
+	elif s.id == '>>=':
+		pass # TODO
+	elif s.id == '>>>=':
+		pass # TODO
+	elif s.id == '&=':
+		pass # TODO
+	elif s.id == '^=':
+		pass # TODO
+	elif s.id == '|=':
+		pass # TODO
+
+	## Comma Operator
+	elif s.id == ',':
+		pass # TODO
 
 	## Statements
 	elif s.id == '(statement)':
