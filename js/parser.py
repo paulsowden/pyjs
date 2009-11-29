@@ -560,7 +560,7 @@ map(reserve,
 
 
 lookahead = []
-prevtoken = token = nexttoken = symbol_table['(begin)']
+prevtoken = token = nexttoken = symbol_table['(begin)']()
 
 
 def peek(p=0):
