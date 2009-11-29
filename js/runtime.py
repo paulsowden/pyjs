@@ -43,7 +43,10 @@ def toNumber(value):
 	if isinstance(value, float):
 		return value
 	if isinstance(value, basestring):
-		return float(value) # TODO
+		try:
+			return float(value) # TODO
+		except ValueError, e:
+			return nan
 	return toNumber(toPrimitive(value, 'number'))
 
 def toInteger(value):
@@ -95,6 +98,8 @@ def toObject(value, c):
 		return JavaScriptString(prototype('string'), value)
 	return value
 
+## Operator Comparisons
+
 def lessThan(x, y):
 	x, y = toPrimitive(x, 'number'), toPrimitive(y, 'number')
 	if typeof(x) != 'string' or typeof(y) != 'string':
@@ -122,6 +127,36 @@ def lessThan(x, y):
 			return True
 		elif ord(x[i]) > ord(y[i]):
 			return False
+
+def strictlyEqual(x, y):
+	typeof_x = typeof(x)
+	if typeof_x != typeof(y):
+		return False
+	if x == None or x == null:
+		return True
+	if typeof_x == 'number':
+		return not isnan(x) and not isnan(y) or x == y
+	return x == y
+
+def equal(x, y):
+	typeof_x, typeof_y = typeof(x), typeof(y)
+	if typeof_x == typeof_y:
+		return strictlyEqual(x, y)
+	if x == null and y == None or x == None and y == null:
+		return True
+	if typeof_x == 'number' and typeof_y == 'string':
+		return equal(x, toNumber(y))
+	if typeof_x == 'string' and typeof_y == 'number':
+		return equal(toNumber(x), y)
+	if typeof_x == 'boolean':
+		return equal(toNumber(x), y)
+	if typeof_y == 'boolean':
+		return equal(x, toNumber(y))
+	if typeof_x in ('string', 'number') and typeof_y == 'object':
+		return equal(x, toPrimitive(y))
+	if typeof_y in ('string', 'number') and typeof_x == 'object':
+		return equal(toPrimitive(x), y)
+	return False
 
 
 class Reference(object):
@@ -1504,13 +1539,17 @@ def execute(s, c):
 
 	## Equality Operators
 	elif s.id == '==':
-		pass # TODO
+		return equal(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
 	elif s.id == '!=':
-		pass # TODO
+		return not equal(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
 	elif s.id == '===':
-		pass # TODO
+		return strictlyEqual(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
 	elif s.id == '!==':
-		pass # TODO
+		return not strictlyEqual(getValue(execute(s.first, c), c),
+			getValue(execute(s.second, c), c))
 
 	## Binary Bitwise Operators
 	elif s.id == '&':
@@ -1522,13 +1561,22 @@ def execute(s, c):
 
 	## Binary Logical Operators
 	elif s.id == '&&':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		if not toBoolean(l):
+			return l
+		return getValue(execute(s.second, c), c)
 	elif s.id == '||':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		if toBoolean(l):
+			return l
+		return getValue(execute(s.second, c), c)
 
 	## Conditional Operator
 	elif s.id == '?':
-		pass # TODO
+		if toBoolean(getValue(execute(s.first, c), c)):
+			return getValue(execute(s.second, c), c)
+		else:
+			return getValue(execute(s.third, c), c)
 
 	## Assignment Operators
 	elif s.id == '=':
@@ -1671,7 +1719,7 @@ def execute(s, c):
 		c.scope = c.scope.parent
 		return r
 	elif s.id == 'switch':
-		pass
+		pass # TODO
 	elif s.id == 'throw':
 		return ('throw', getValue(execute(s.first, c)), None)
 	elif s.id == 'try':
