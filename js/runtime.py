@@ -54,6 +54,13 @@ def toInteger(value):
 		return value
 	return int(copysign(1, value) * (abs(value) // 1))
 
+def toUint32(value):
+	value = toNumber(value)
+	if isnan(value) or isinf(value) or value == 0:
+		return 0
+	value = copysign(1, value) * math.floor(abs(value))
+	return value % 4294967296 # 2^32
+
 def toString(value):
 	type = typeof(value)
 	if type == 'boolean':
@@ -209,7 +216,9 @@ class JavaScriptObject(object):
 		if self.properties[key].dont_delete:
 			return False
 		del self.properties[key]
-		self.ordered_keys.remove(key)
+		if key in self.ordered_keys:
+			# arrays don't store their indexes in the ordered_keys list
+			self.ordered_keys.remove(key)
 		return True
 
 	def __contains__(self, key): # [[HasProperty]]
@@ -334,6 +343,30 @@ class JavaScriptFunction(JavaScriptObject):
 
 class JavaScriptArray(JavaScriptObject):
 	name = 'Array'
+	def __init__(self, prototype):
+		super(JavaScriptArray, self).__init__(prototype)
+		self.put('length', 0.0, dont_enum=True, dont_delete=True)
+	def __setitem__(self, key, value):
+		if not self.can_put(key):
+			return False
+		if key != 'length':
+			if key in self.properties:
+				self.properties[key].value = value
+			else:
+				self.properties[key] = Property(value)
+			i = toUint32(key)
+			if toString(i) == key and self.properties['length'].value <= i:
+				self.properties['length'].value = i + 1.0
+			else:
+				self.ordered_keys.append(key)
+		else:
+			i = toUint32(value)
+			if i != toNumber(value):
+				raise JavaScriptError() # TODO range error
+			for a in range(int(i), int(self.properties['length'].value)):
+				del self[str(a)]
+			self.properties['length'].value = i
+	# TODO implement iter over the numerical indices
 
 class JavaScriptString(JavaScriptObject):
 	name = 'String'
@@ -955,15 +988,20 @@ class JavaScriptArrayConstructor(JavaScriptFunction):
 			JavaScriptArrayPrototype(object_prototype, function_prototype),
 			True, True, True)
 		self['prototype'].put('constructor', self, dont_enum=True)
-	def call(self, this, args, s):
-		return self.construct(args, s)
-	def construct(self, args, s):
-		if len(args) == 1:
-			# TODO create an array with length args[0]
-			return JavaScriptArray(self['prototype'])
+	def call(self, this, args, c):
+		return self.construct(args, c)
+	def construct(self, args, c):
+		if len(args) == 1 and isinstance(args[0], float):
+			if args[0] != toUint32(args[0]):
+				raise JavaScriptException(
+					c.global_object.range_error.construct([], c))
+			array = JavaScriptArray(self['prototype'])
+			array['length'] = args[0]
 		else:
-			# TODO create an array with elements args
-			return JavaScriptArray(self['prototype'])
+			array = JavaScriptArray(self['prototype'])
+			for i, arg in enumerate(args):
+				array[str(i)] = arg
+		return array
 
 class JavaScriptStringConstructor(JavaScriptFunction):
 	def __init__(self, object_prototype, function_prototype):
@@ -1321,6 +1359,8 @@ def execute(s, c):
 
 	elif s.id == '(array)':
 		array = c.global_object.array.construct([], c)
+		for i, arg in enumerate(s.first):
+			array[str(i)] = getValue(execute(arg, c), c)
 		return array
 
 	elif s.id == '(object)':
