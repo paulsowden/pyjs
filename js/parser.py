@@ -10,7 +10,8 @@ class JavaScriptSyntaxError(SyntaxError):
 			t = token
 		self.lineno = t.lineno
 		self.offset = t.offset
-		self.text = lexer.lines[t.lineno]
+		# if the token is (end) the lineno is len+1
+		self.text = lexer.lines[min(t.lineno, len(lexer.lines) - 1)]
 		self.filename = lexer.filename
 
 class Symbol(object):
@@ -573,9 +574,11 @@ def peek(p=0):
 		j += 1
 	return t
 
-def advance(id='', t=None):
+def advance(id=None, t=None):
 	global token, prevtoken, nexttoken
 	prevtoken, token = token, nexttoken
+	if id and token.id != id:
+		raise JavaScriptSyntaxError('Expected %s' % id, token)
 	while 1:
 		nexttoken = len(lookahead) and lookahead.pop(0) or lexer.token()
 		if nexttoken.id == '(end)':
