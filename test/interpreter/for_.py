@@ -1,6 +1,6 @@
 import unittest
 from js.parser import JavaScriptSyntaxError
-from js.runtime import run, GlobalObject
+from js.interpreter import run, GlobalObject
 
 class LabelledStatement(unittest.TestCase):
 	def test_missing_label(self):

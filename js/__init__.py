@@ -1,4 +1,4 @@
-import parser, runtime
+import parser, interpreter
 
-__all__ = ['parser', 'runtime']
+__all__ = ['parser', 'interpreter']
 

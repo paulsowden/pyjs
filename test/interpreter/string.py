@@ -1,7 +1,6 @@
 import math
 import unittest
-
-from js.runtime import run, GlobalObject
+from js.interpreter import run, GlobalObject
 
 class String(unittest.TestCase):
 	def test_String(self):

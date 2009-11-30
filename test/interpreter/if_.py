@@ -1,7 +1,5 @@
-
 import unittest
-
-from js.runtime import run, GlobalObject
+from js.interpreter import run, GlobalObject
 
 class ElsePrecedence(unittest.TestCase):
 
