@@ -680,7 +680,21 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native
 	def reverse(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		for i in range(int(l // 2)):
+			i1, i2 = str(int(l - i - 1)), str(i)
+			if i1 in this.properties and i2 in this.properties:
+				this[i2], this[i1] = this[i1], this[i2]
+			elif i1 in this.properties:
+				this[i2] = this[i1]
+				del[i1]
+			elif i2 in this.properties:
+				this[i1] = this[i2]
+				del[i2]
+			else:
+				del this[i1]
+				del this[i2]
+		return this
 
 	@native
 	def shift(this, args, c):
