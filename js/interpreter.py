@@ -106,6 +106,42 @@ def toObject(value, c):
 		return JavaScriptString(prototype('string'), value)
 	return value
 
+def applyOperator(operator, l, r):
+	## Multiplicative Operators
+	if operator == '/':
+		return toNumber(l) / toNumber(r)
+	if operator == '*':
+		return toNumber(l) / toNumber(r)
+	if operator == '%':
+		l, r = toNumber(l), toNumber(r)
+		return (l % r) - (0 if l >= 0 else r)
+
+	## Additive Operators
+	if operator == '-':
+		return toNumber(l) / toNumber(r)
+	if operator == '+':
+		l, r = toPrimitive(l), toPrimitive(r)
+		if typeof(l) == 'string' or typeof(r) == 'string':
+			return toString(l) + toString(r)
+		else:
+			return toNumber(l) + toNumber(r)
+
+	## Bitwise Shift Operators
+	if operator == '<<':
+		return float(int(toInt32(l)) << int(toInt32(r) & 0x1f))
+	if operator == '>>':
+		return float(int(toInt32(l)) >> int(toInt32(r) & 0x1f))
+	if operator == '>>>':
+		pass # TODO
+
+	## Binary Bitwise Operators
+	if operator == '&':
+		return float(int(toInt32(l)) & int(toInt32(r)))
+	if operator == '^':
+		return float(int(toInt32(l)) ^ int(toInt32(r)))
+	if operator == '|':
+		return float(int(toInt32(l)) | int(toInt32(r)))
+
 ## Operator Comparisons
 
 def lessThan(x, y):
@@ -1498,45 +1534,11 @@ def evaluate(s, c):
 	elif s.id == '!':
 		return not toBoolean(getValue(evaluate(s.first, c), c))
 
-	## Multiplicative Operators
-	elif s.id == '/':
-		l = toNumber(getValue(evaluate(s.first, c), c))
-		r = toNumber(getValue(evaluate(s.second, c), c))
-		return l / r
-	elif s.id == '*':
-		l = toNumber(getValue(evaluate(s.first, c), c))
-		r = toNumber(getValue(evaluate(s.second, c), c))
-		return l * r
-	elif s.id == '%':
-		l = toNumber(getValue(evaluate(s.first, c), c))
-		r = toNumber(getValue(evaluate(s.second, c), c))
-		return (l % r) - (0 if l >= 0 else r)
-
-	## Additive Operators
-	elif s.id == '+':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		l, r = toPrimitive(l), toPrimitive(r)
-		if typeof(l) == 'string' or typeof(r) == 'string':
-			return toString(l) + toString(r)
-		else:
-			return toNumber(l) + toNumber(r)
-	elif s.id == '-':
-		l = toNumber(getValue(evaluate(s.first, c), c))
-		r = toNumber(getValue(evaluate(s.second, c), c))
-		return l - r
-
-	## Bitwise Shift Operators
-	elif s.id == '<<':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		return float(int(toInt32(l)) << int(toInt32(r) & 0x1f))
-	elif s.id == '>>':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		return float(int(toInt32(l)) >> int(toInt32(r) & 0x1f))
-	elif s.id == '>>>':
-		pass # TODO
+	## Multiplicative Operators, Additive Operators
+	## Binary Bitwise Operators, Bitwise Shift Operators
+	elif s.id in ('/', '*', '%', '+', '-', '&', '^', '|', '<<', '>>', '>>>'):
+		return applyOperator(s.id, getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 
 	## Relational Operators
 	elif s.id == '<':
@@ -1587,20 +1589,6 @@ def evaluate(s, c):
 		return not strictlyEqual(getValue(evaluate(s.first, c), c),
 			getValue(evaluate(s.second, c), c))
 
-	## Binary Bitwise Operators
-	elif s.id == '&':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		return float(int(toInt32(l)) & int(toInt32(r)))
-	elif s.id == '^':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		return float(int(toInt32(l)) ^ int(toInt32(r)))
-	elif s.id == '|':
-		l = getValue(evaluate(s.first, c), c)
-		r = getValue(evaluate(s.second, c), c)
-		return float(int(toInt32(l)) | int(toInt32(r)))
-
 	## Binary Logical Operators
 	elif s.id == '&&':
 		l = getValue(evaluate(s.first, c), c)
@@ -1626,32 +1614,20 @@ def evaluate(s, c):
 		r = getValue(evaluate(s.second, c), c)
 		putValue(l, r, c)
 		return r
-	elif s.id == '*=':
-		pass # TODO
-	elif s.id == '/=':
-		pass # TODO
-	elif s.id == '%=':
-		pass # TODO
-	elif s.id == '+=':
-		pass # TODO
-	elif s.id == '-=':
-		pass # TODO
-	elif s.id == '<<=':
-		pass # TODO
-	elif s.id == '>>=':
-		pass # TODO
-	elif s.id == '>>>=':
-		pass # TODO
-	elif s.id == '&=':
-		pass # TODO
-	elif s.id == '^=':
-		pass # TODO
-	elif s.id == '|=':
-		pass # TODO
+	elif s.id in ('*=', '/=', '%=', '+=', '-=',
+			'<<=', '>>=', '>>>=', '&=', '^=', '|='):
+		operator = s.id[:-1]
+		o = evaluate(s.first, c)
+		l = getValue(o, c)
+		r = getValue(evaluate(s.second, c), c)
+		v = applyOperator(operator, l, r)
+		putValue(o, v, c)
+		return v
 
 	## Comma Operator
 	elif s.id == ',':
-		pass # TODO
+		getValue(evaluate(s.first, c), c)
+		return getValue(evaluate(s.second, c), c)
 
 	## Statements
 	elif s.id == '(statement)':
