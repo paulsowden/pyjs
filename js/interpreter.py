@@ -1516,7 +1516,11 @@ def evaluate(s, c):
 	elif s.id == '+':
 		l = getValue(evaluate(s.first, c), c)
 		r = getValue(evaluate(s.second, c), c)
-		return l + r
+		l, r = toPrimitive(l), toPrimitive(r)
+		if typeof(l) == 'string' or typeof(r) == 'string':
+			return toString(l) + toString(r)
+		else:
+			return toNumber(l) + toNumber(r)
 	elif s.id == '-':
 		l = toNumber(getValue(evaluate(s.first, c), c))
 		r = toNumber(getValue(evaluate(s.second, c), c))
