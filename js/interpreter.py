@@ -547,7 +547,11 @@ class JavaScriptObjectPrototype(JavaScriptNativePrototype):
 
 	@native
 	def toLocaleString(this, args, c):
-		pass # TODO
+		toString = c['toString']
+		if not hasattr(c, 'call'):
+			raise JavaScriptException(
+				c.global_object.type_error.construct([], c))
+		return toString.call(this, args, c)
 
 	@native
 	def valueOf(this, args, c):
@@ -594,10 +598,10 @@ class JavaScriptFunctionPrototype(JavaScriptNativePrototype):
 		argArray = args[1] if len(args) > 1 else None
 		if argArray is None or argArray is null:
 			argArray = []
-		elif isinstance(argArray, ArgumentsObject):
-			argArray = [] # TODO
-		elif isinstance(argArray, JavaScriptArray):
-			argArray = [] # TODO
+		elif isinstance(argArray, ArgumentsObject) or \
+				isinstance(argArray, JavaScriptArray):
+			argArray = [argArray[str(i)] \
+				for i in range(int(toUint32(argArray['length'])))]
 		else:
 			raise JavaScriptException(
 				c.global_object.type_error.construct([], c))
@@ -618,10 +622,10 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native
 	def toString(this, args, c):
-		if not isintance(this, JavaScriptArray):
+		if not isinstance(this, JavaScriptArray):
 			raise JavaScriptException(
 				c.global_object.type_error.construct([], c))
-		# TODO return join()
+		return c.global_object.array['prototype']['join'].call(this, ',', c)
 
 	@native
 	def toLocaleString(this, args, c):
@@ -629,19 +633,50 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native(length=1)
 	def concat(this, args, c):
-		pass # TODO
+		a = c.global_object.array.construct([], c)
+		n = 0
+		for e in [this] + args:
+			if isinstance(e, JavaScriptArray):
+				for i in map(str, range(int(e['length']))):
+					if i in this.properties:
+						a[str(n)] = e[i]
+					n += 1
+			else:
+				a[str(n)] = e
+				n += 1
+		a['length'] = float(n)
+		return a
 
 	@native(length=1)
 	def join(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		sep = ',' if not len(args) or args[0] == None else toString(args[0])
+		if not l:
+			return ''
+		els = (this[str(i)] for i in range(int(l)))
+		return sep.join(toString(el) if el is not None and el != null else ''
+			for el in els)
 
 	@native
 	def pop(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		if l == 0:
+			this['length'] = l
+			return None
+		i = str(toInteger(l - 1))
+		el = this[i]
+		del this[i]
+		this['length'] = l - 1
+		return el
 
 	@native(length=1)
 	def push(this, args, c):
-		pass # TODO
+		n = toUint32(this['length'])
+		for arg in args:
+			this[toString(n)] = arg
+			n += 1
+		this['length'] = n
+		return n
 
 	@native
 	def reverse(this, args, c):
@@ -649,11 +684,35 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native
 	def shift(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		if l == 0:
+			this['length'] = l
+			return None
+		el = this['0']
+		for i in range(1,int(l)):
+			if str(int(i)) in this.properties:
+				this[str(int(i - 1))] = this[str(int(i))]
+			else:
+				del this[str(int(i - 1))]
+		del this[str(int(l - 1))]
+		this['length'] = l - 1
+		return el
 
 	@native(length=2)
 	def slice(this, args, c):
-		pass # TODO
+		a = c.global_object.array.construct([], c)
+		l = toUint32(this['length'])
+		start = toInteger(args[0] if len(args) else None)
+		start = max(l + start, 0) if start < 0 else min(start, l)
+		end = toInteger(args[1]) if len(args) > 1 or args[1] is None else l
+		end = max(l + end) if end < 0 else min(end, l)
+		n = 0
+		for i in range(start, end):
+			if str(i) in this.properties:
+				a[str(n)] = this[str(i)]
+			n += 1
+		a['length'] = float(n)
+		return a
 
 	@native(length=1)
 	def sort(this, args, c):
@@ -661,11 +720,50 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native(length=2)
 	def splice(this, args, c):
-		pass # TODO
+		a = c.global_object.array.construct([], c)
+		l = toUint32(this['length'])
+		start = toInteger(args[0] if len(args) else None)
+		start = int(max(l + start, 0) if start < 0 else min(start, l))
+		delete = int(min(max(
+			toInteger(args[1] if len(args) > 1 else None), 0), l - start))
+		n = 0
+		for i in map(str, range(start, start + delete)):
+			if i in this.properties:
+				a[str(n)] = this[i]
+			n += 1
+		a['length'] = float(n)
+		els = args[2:]
+		if len(els) < delete:
+			for i in range(start, start + int(l) - len(els)):
+				if str(i + delete) in this.properties:
+					this[str(i + len(els))] = this[str(i + delete)]
+				else:
+					del this[str(i + len(els))]
+			for i in range(int(l) - (delete - len(els)), int(l)):
+				del this[str(i)]
+		elif len(els) > delete:
+			for i in reversed(range(start, int(l) - delete + 1)):
+				if str(i + delete - 1) in this.properties:
+					this[str(i + len(els) - 1)] = this[str(i + delete - 1)]
+				else:
+					del this[str(i + len(els) - 1)]
+		for i, el in enumerate(els):
+			this[str(i + start)] = el
+		this['length'] = l - delete + len(els)
+		return a
 
 	@native(length=1)
 	def unshift(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		for i in reversed(range(0,int(l))):
+			if str(int(i)) in this.properties:
+				this[str(int(i + len(args)))] = this[str(int(i))]
+			else:
+				del this[str(int(i))]
+		for i, arg in enumerate(args):
+			this[str(i)] = arg
+		this['length'] = l + len(args)
+		return l + len(args)
 
 class JavaScriptStringPrototype(JavaScriptNativePrototype):
 	__metaclass__ = NativeFunctions
