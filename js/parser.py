@@ -277,8 +277,7 @@ def nud(self):
 		key = optionalidentifier()
 		if not key:
 			if nexttoken.id in ('(string)', '(number)'):
-				advance()
-				key = token
+				key = advance()
 			else:
 				raise JavaScriptSyntaxError(
 					"Expected '}' and instead saw '%s'." % nexttoken.value, nexttoken)
@@ -298,8 +297,7 @@ def varstatement(prefix=False):
 		if prefix:
 			return [var]
 		if nexttoken.id == '=':
-			t = nexttoken
-			advance('=')
+			t = advance('=')
 			var = symbol_table['='](t, var, parse(19))
 		vars.append(var)
 		if nexttoken.id != ',':
@@ -313,9 +311,8 @@ def nud(self):
 	return self
 
 def functionparams():
-	t = nexttoken
+	t = advance('(')
 	p = []
-	advance('(')
 	while nexttoken.id != ')':
 		p.append(identifier())
 		if nexttoken.id == ',':
@@ -354,8 +351,7 @@ def nud(self):
 
 @method(blockstmt('if'))
 def nud(self):
-	t = nexttoken
-	advance('(')
+	t = advance('(')
 	self.first = parse(5)
 	advance(')', t)
 	self.block = block()
@@ -369,10 +365,9 @@ def nud(self):
 	self.block = block()
 	if nexttoken.id == 'catch':
 		advance('catch')
-		advance('(')
-		advance('(identifier)')
-		self.e = token
-		advance(')')
+		t = advance('(')
+		self.e = advance('(identifier)')
+		advance(')', t)
 		self.catchblock = block()
 	if nexttoken.id == 'finally':
 		advance('finally')
@@ -384,8 +379,7 @@ def nud(self):
 
 @method(blockstmt('while'))
 def nud(self):
-	t = nexttoken
-	advance('(')
+	t = advance('(')
 	self.first = parse(5)
 	advance(')', t)
 	context.iteration_depth += 1
@@ -395,8 +389,7 @@ def nud(self):
 
 @method(blockstmt('with'))
 def nud(self):
-	t = nexttoken
-	advance('(')
+	t = advance('(')
 	self.first = parse(5)
 	advance(')', t)
 	self.block = block()
@@ -404,40 +397,38 @@ def nud(self):
 
 @method(blockstmt('switch'))
 def nud(self):
-	t = nexttoken
-	g = False
-	advance('(')
+	t = advance('(')
 	self.condition = parse(20)
 	advance(')', t)
-	t = nexttoken
 	context.switch_depth += 1
-	advance('{')
+	t = advance('{')
 	self.cases = []
+	case = default = None
 	while 1:
 		if nexttoken.id == 'case':
-			advance('case')
-			self.cases.append(parse(20))
-			g = True
+			case = advance('case')
+			case.first = parse(20)
+			self.cases.append(case)
 			advance(':')
 		elif nexttoken.id == 'default':
-			advance('default')
-			g = True
+			if default:
+				raise JavaScriptSyntaxError(
+					"More than one default statement", nexttoken)
+			case = default = advance('default')
+			self.cases.append(case)
 			advance(':')
 		elif nexttoken.id == '}':
 			advance('}', t)
 			context.switch_depth -= 1
 			return self
-		elif nexttoken.id == '(end)':
-			raise JavaScriptSyntaxError("Missing '}'.", nexttoken);
-		elif g:
-			if token.id == ',':
-				raise JavaScriptSyntacError(
-					"Each value should have its own case label.", token)
-			elif token.id == ':':
-				statements()
-			else:
-				raise JavaScriptSyntaxError("Missing ':' on a case clause.", token)
+		elif case:
+			casestatements = statements()
+			if casestatements:
+				case.block = casestatements
+			case = None
 		else:
+			if nexttoken.id == '(end)':
+				raise JavaScriptSyntaxError("Missing '}'.", nexttoken);
 			raise JavaScriptSyntaxError(
 				"Expected 'case' and instead saw '%s'." % nexttoken.value, nexttoken)
 
@@ -449,24 +440,20 @@ def nud(self):
 	self.block = block()
 	context.iteration_depth -= 1
 	advance('while')
-	t = nexttoken
-	advance('(')
+	t = advance('(')
 	self.second = parse(5)
 	advance(')', t)
 	return self
 
 @method(blockstmt('for'))
 def nud(self):
-	t = nexttoken
-	advance('(')
+	t = advance('(')
 	if peek(nexttoken.id == 'var' and 1 or 0).id == 'in':
 		if nexttoken.id == 'var':
-			advance('var')
-			self.iterator = symbol_table['var']()
+			self.iterator = advance('var')
 			self.iterator.first = varstatement(True)
 		else:
-			self.iterator = nexttoken
-			advance('(identifier)')
+			self.iterator = advance('(identifier)')
 		advance('in')
 		self.object = parse(20)
 		advance(')', t)
@@ -481,16 +468,14 @@ def nud(self):
 			else:
 				self.initializer = parse(0, 'for')
 				while nexttoken.id == ',':
-					comma = nexttoken
-					advance(',')
+					comma = advance(',')
 					self.initializer = symbol_table[','](
 						comma, self.initializer, parse(0, 'for'))
 		advance(';')
 		if nexttoken.id != ';':
 			self.condition = parse(20)
 			if nexttoken.id == '=':
-				eq = nexttoken
-				advance('=')
+				eq = advance('=')
 				self.condition = symbol_table['='](
 					eq, self.condition, parse(20))
 		advance(';')
@@ -500,8 +485,7 @@ def nud(self):
 		if nexttoken.id != ')':
 			self.counter = parse(0, 'for')
 			while nexttoken.id == ',':
-				comma = nexttoken
-				advance(',')
+				comma = advance(',')
 				self.counter = symbol_table[','](
 					comma, self.counter, parse(0, 'for'))
 		advance(')', t)
@@ -516,8 +500,7 @@ def nud(self):
 		if nexttoken.value not in context.labels:
 			raise JavaScriptSyntaxError(
 				"Unrecognized label '%s'." % nexttoken.value, nexttoken)
-		advance('(identifier)')
-		self.first = token
+		self.first = advance('(identifier)')
 	elif not context.iteration_depth and not context.switch_depth:
 		raise JavaScriptSyntaxError(
 			"break outside of a loop or a switch", token)
@@ -532,8 +515,7 @@ def nud(self):
 		if nexttoken.value not in context.labels:
 			raise JavaScriptSyntaxError(
 				"Unrecognized label '%s'." % nexttoken.value, nexttoken)
-		advance('(identifier)')
-		self.first = token
+		self.first = advance('(identifier)')
 	return self
 
 @method(stmt('return'))
@@ -581,10 +563,9 @@ def advance(id=None, t=None):
 		raise JavaScriptSyntaxError('Expected %s' % id, token)
 	while 1:
 		nexttoken = len(lookahead) and lookahead.pop(0) or lexer.token()
-		if nexttoken.id == '(end)':
-			return
 		if nexttoken.id != '(endline)':
 			break
+	return token
 
 
 # This is the heart of JSLINT, the Pratt parser. In addition to parsing, it
@@ -628,8 +609,7 @@ def statement():
 			raise JavaScriptSyntaxError(
 				"Duplicate label '%s'." % t.value, t)
 		context.labels.add(t.value)
-		s.labels.add(t)
-		advance('(identifier)')
+		s.labels.add(advance('(identifier)'))
 		advance(':')
 		t = nexttoken
 	s.first = parse(0, True)
@@ -651,9 +631,8 @@ def statements():
 	return statements
 
 def block(f=False):
-	t = nexttoken
 	if nexttoken.id == '{':
-		advance('{')
+		t = advance('{')
 		s = statements()
 		advance('}', t)
 	else:
