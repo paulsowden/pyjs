@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import os, readline, atexit
-from js.runtime import run, GlobalObject, toRepr
+from js.interpreter import run, GlobalObject, toRepr
 
 def setup_history():
 	history_file = os.path.join(os.environ["HOME"], ".pyjs_history")
