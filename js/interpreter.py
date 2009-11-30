@@ -1742,12 +1742,12 @@ def evaluate(s, c):
 		while not result:
 			cases = s.cases
 			if default is not None:
-				cases = cases[i:]
+				cases = cases[default:]
 				result = ('normal', None, None)
 			for i, case in enumerate(cases):
-				if case.id == 'default' and default is not None:
+				if case.id == 'default' and default is None:
 					default = i
-				elif not result:
+				elif case.id == 'case' and not result:
 					if strictlyEqual(getValue(evaluate(case.first, c), c), v):
 						result = ('normal', None, None)
 				if result and hasattr(case, 'block'):
