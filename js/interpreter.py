@@ -315,7 +315,7 @@ class ExecutionContext(object):
 				name = param.value
 				vars.put(param.value, args[str(i)], dont_delete=True)
 		for name, function_decl in s.functions.items():
-			vars.put(name.value, execute(function_decl, self),
+			vars.put(name.value, evaluate(function_decl, self),
 				dont_delete=True)
 		for name in s.vars:
 			if name not in vars:
@@ -352,7 +352,7 @@ class JavaScriptFunction(JavaScriptObject):
 			dont_delete=True)
 		c = ExecutionContext(Scope(self.scope, activation), this, global_object)
 		c.instantiate_variables(self.symbol, activation)
-		v = execute(self.symbol.block, c)
+		v = evaluate(self.symbol.block, c)
 		if v[0] == 'throw':
 			raise JavaScriptException(v[1])
 		if v[0] == 'return':
@@ -1354,10 +1354,10 @@ class GlobalObject(JavaScriptObject):
 			pass # TODO
 
 
-## Execute
+## Evaluate
 
-def execute(s, c):
-	"executes symbol `s` in context `c`"
+def evaluate(s, c):
+	"evaluates symbol `s` in context `c`"
 
 	#print s
 	if isinstance(s, list) or s.id == '{': # block statement
@@ -1367,7 +1367,7 @@ def execute(s, c):
 			return ('normal', None, None)
 		for statement in s:
 			try:
-				v = execute(statement, c)
+				v = evaluate(statement, c)
 			except JavaScriptException, e:
 				return ('throw', e.value, None)
 			if v[0] != 'normal':
@@ -1403,7 +1403,7 @@ def execute(s, c):
 	elif s.id == '(array)':
 		array = c.global_object.array.construct([], c)
 		for i, arg in enumerate(s.first):
-			array[str(i)] = getValue(execute(arg, c), c)
+			array[str(i)] = getValue(evaluate(arg, c), c)
 		return array
 
 	elif s.id == '(object)':
@@ -1412,10 +1412,10 @@ def execute(s, c):
 			if k.id == '(identifier)':
 				key = k.value
 			elif k.id == '(number)':
-				key = toString(execute(k, c))
+				key = toString(evaluate(k, c))
 			else: # (string)
-				key = execute(k, c)
-			o[key] = getValue(execute(v, c), c)
+				key = evaluate(k, c)
+			o[key] = getValue(evaluate(v, c), c)
 		return o
 
 
@@ -1423,16 +1423,16 @@ def execute(s, c):
 
 	elif s.id == '.':
 		return Reference(
-			toObject(getValue(execute(s.first, c), c), c),
+			toObject(getValue(evaluate(s.first, c), c), c),
 			s.second.value)
 	elif s.id == '[': # property
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return Reference(toObject(l, c), toString(r))
 
 	elif s.id == 'new':
-		l = getValue(execute(s.first, c), c)
-		args = [getValue(execute(arg, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		args = [getValue(evaluate(arg, c), c)
 			for arg in getattr(s, 'params', [])]
 		if typeof(l) != 'object' or not hasattr(l, 'construct'):
 			raise JavaScriptException(
@@ -1440,8 +1440,8 @@ def execute(s, c):
 		return l.construct(args, c)
 
 	elif s.id == '(':
-		o = execute(s.first, c)
-		args = [getValue(execute(arg, c), c) for arg in s.params]
+		o = evaluate(s.first, c)
+		args = [getValue(evaluate(arg, c), c) for arg in s.params]
 		f = getValue(o, c)
 		if typeof(f) != 'object' or not hasattr(f, 'call'):
 			raise JavaScriptException(
@@ -1453,7 +1453,7 @@ def execute(s, c):
 
 	## Postfix Expressions
 	elif s.id == '++':
-		l = execute(s.first, c)
+		l = evaluate(s.first, c)
 		v = toNumber(getValue(l, c))
 		if hasattr(s, 'arity'):
 			v += 1.0
@@ -1462,7 +1462,7 @@ def execute(s, c):
 			putValue(l, v + 1.0, c)
 		return v
 	elif s.id == '--':
-		l = execute(s.first, c)
+		l = evaluate(s.first, c)
 		v = toNumber(getValue(l, c))
 		if hasattr(s, 'arity'):
 			v -= 1.0
@@ -1473,7 +1473,7 @@ def execute(s, c):
 
 	## Unary Operators
 	elif s.id == 'typeof':
-		l = execute(s.first, c)
+		l = evaluate(s.first, c)
 		if isinstance(l, Reference) and l.base == None:
 			return 'undefined'
 		o = getValue(l, c)
@@ -1482,70 +1482,78 @@ def execute(s, c):
 			return 'function'
 		return type
 	elif s.id == 'void':
-		l = getValue(execute(s.first, c), c)
+		l = getValue(evaluate(s.first, c), c)
 		return None
 	elif s.id == 'delete':
-		l = execute(s.first, c)
+		l = evaluate(s.first, c)
 		if not isinstance(l, Reference):
 			return True
 		return l.base.__delitem__(l.property_name)
 	elif s.id == '+' and hasattr(s, 'arity'): # unary
-		return toNumber(getValue(execute(s.first, c), c))
+		return toNumber(getValue(evaluate(s.first, c), c))
 	elif s.id == '-' and hasattr(s, 'arity'): # unary
-		return -toNumber(getValue(execute(s.first, c), c))
+		return -toNumber(getValue(evaluate(s.first, c), c))
 	elif s.id == '~':
-		return float(~int(toInt32(getValue(execute(s.first, c), c))))
+		return float(~int(toInt32(getValue(evaluate(s.first, c), c))))
 	elif s.id == '!':
-		return not toBoolean(getValue(execute(s.first, c), c))
+		return not toBoolean(getValue(evaluate(s.first, c), c))
 
 	## Multiplicative Operators
 	elif s.id == '/':
-		return toNumber(getValue(execute(s.first, c), c)) / toNumber(getValue(execute(s.second, c), c))
+		l = toNumber(getValue(evaluate(s.first, c), c))
+		r = toNumber(getValue(evaluate(s.second, c), c))
+		return l / r
 	elif s.id == '*':
-		return toNumber(getValue(execute(s.first, c), c)) * toNumber(getValue(execute(s.second, c), c))
+		l = toNumber(getValue(evaluate(s.first, c), c))
+		r = toNumber(getValue(evaluate(s.second, c), c))
+		return l * r
 	elif s.id == '%':
-		l = toNumber(getValue(execute(s.first, c), c))
-		r = toNumber(getValue(execute(s.second, c), c))
+		l = toNumber(getValue(evaluate(s.first, c), c))
+		r = toNumber(getValue(evaluate(s.second, c), c))
 		return (l % r) - (0 if l >= 0 else r)
 
 	## Additive Operators
 	elif s.id == '+':
-		return getValue(execute(s.first, c), c) + getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
+		return l + r
 	elif s.id == '-':
-		return getValue(execute(s.first, c), c) - getValue(execute(s.second, c), c)
+		l = toNumber(getValue(evaluate(s.first, c), c))
+		r = toNumber(getValue(evaluate(s.second, c), c))
+		return l - r
 
 	## Bitwise Shift Operators
 	elif s.id == '<<':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return float(int(toInt32(l)) << int(toInt32(r) & 0x1f))
 	elif s.id == '>>':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return float(int(toInt32(l)) >> int(toInt32(r) & 0x1f))
 	elif s.id == '>>>':
 		pass # TODO
 
 	## Relational Operators
 	elif s.id == '<':
-		r = lessThan(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		r = lessThan(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 		return False if r == None else r
 	elif s.id == '>':
-		r = lessThan(getValue(execute(s.second, c), c),
-			getValue(execute(s.first, c), c))
+		r = lessThan(getValue(evaluate(s.second, c), c),
+			getValue(evaluate(s.first, c), c))
 		return False if r == None else r
 	elif s.id == '<=':
-		r = lessThan(getValue(execute(s.second, c), c),
-			getValue(execute(s.first, c), c))
+		r = lessThan(getValue(evaluate(s.second, c), c),
+			getValue(evaluate(s.first, c), c))
 		return False if r == None else not r
 	elif s.id == '>=':
-		r = lessThan(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		r = lessThan(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 		return False if r == None else not r
 	elif s.id == 'instanceof':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
 			raise JavaScriptException(
 				c.global_object.type_error.construct([], c))
@@ -1554,8 +1562,8 @@ def execute(s, c):
 				c.global_object.type_error.construct([], c))
 		return r.has_instance(l, c)
 	elif s.id == 'in':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		if not isinstance(r, JavaScriptObject):
 			raise JavaScriptException(
 				c.global_object.type_error.construct([], c))
@@ -1563,55 +1571,55 @@ def execute(s, c):
 
 	## Equality Operators
 	elif s.id == '==':
-		return equal(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		return equal(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 	elif s.id == '!=':
-		return not equal(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		return not equal(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 	elif s.id == '===':
-		return strictlyEqual(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		return strictlyEqual(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 	elif s.id == '!==':
-		return not strictlyEqual(getValue(execute(s.first, c), c),
-			getValue(execute(s.second, c), c))
+		return not strictlyEqual(getValue(evaluate(s.first, c), c),
+			getValue(evaluate(s.second, c), c))
 
 	## Binary Bitwise Operators
 	elif s.id == '&':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return float(int(toInt32(l)) & int(toInt32(r)))
 	elif s.id == '^':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return float(int(toInt32(l)) ^ int(toInt32(r)))
 	elif s.id == '|':
-		l = getValue(execute(s.first, c), c)
-		r = getValue(execute(s.second, c), c)
+		l = getValue(evaluate(s.first, c), c)
+		r = getValue(evaluate(s.second, c), c)
 		return float(int(toInt32(l)) | int(toInt32(r)))
 
 	## Binary Logical Operators
 	elif s.id == '&&':
-		l = getValue(execute(s.first, c), c)
+		l = getValue(evaluate(s.first, c), c)
 		if not toBoolean(l):
 			return l
-		return getValue(execute(s.second, c), c)
+		return getValue(evaluate(s.second, c), c)
 	elif s.id == '||':
-		l = getValue(execute(s.first, c), c)
+		l = getValue(evaluate(s.first, c), c)
 		if toBoolean(l):
 			return l
-		return getValue(execute(s.second, c), c)
+		return getValue(evaluate(s.second, c), c)
 
 	## Conditional Operator
 	elif s.id == '?':
-		if toBoolean(getValue(execute(s.first, c), c)):
-			return getValue(execute(s.second, c), c)
+		if toBoolean(getValue(evaluate(s.first, c), c)):
+			return getValue(evaluate(s.second, c), c)
 		else:
-			return getValue(execute(s.third, c), c)
+			return getValue(evaluate(s.third, c), c)
 
 	## Assignment Operators
 	elif s.id == '=':
-		l = execute(s.first, c)
-		r = getValue(execute(s.second, c), c)
+		l = evaluate(s.first, c)
+		r = getValue(evaluate(s.second, c), c)
 		putValue(l, r, c)
 		return r
 	elif s.id == '*=':
@@ -1643,7 +1651,7 @@ def execute(s, c):
 
 	## Statements
 	elif s.id == '(statement)':
-		v = execute(s.first, c)
+		v = evaluate(s.first, c)
 		if isinstance(v, tuple):
 			if v[0] == 'break' and v[2] in set(l.value for l in s.labels):
 				return ('normal', v[1], None)
@@ -1653,21 +1661,21 @@ def execute(s, c):
 	elif s.id == 'var':
 		for var in s.first:
 			if var.id == '(identifier)': continue
-			execute(var, c) # assignment
+			evaluate(var, c) # assignment
 		return ('normal', None, None)
 
 	elif s.id == 'if':
-		if toBoolean(getValue(execute(s.first, c), c)):
-			return execute(s.block, c)
+		if toBoolean(getValue(evaluate(s.first, c), c)):
+			return evaluate(s.block, c)
 		elif hasattr(s, 'elseblock'):
-			return execute(s.elseblock, c)
+			return evaluate(s.elseblock, c)
 		else:
 			return ('normal', None, None)
 
 	elif s.id == 'do':
 		t = True
 		while t:
-			v = execute(s.block, c)
+			v = evaluate(s.block, c)
 			if v[0] == 'continue' and \
 					(not v[2] or v[2] in set(l.value for l in s.labels)):
 				pass
@@ -1676,13 +1684,13 @@ def execute(s, c):
 				return ('normal', v[1], None)
 			elif v[0] != 'normal':
 				return v
-			t = toBoolean(getValue(execute(s.second, c), c))
+			t = toBoolean(getValue(evaluate(s.second, c), c))
 		return ('normal', v[1], None)
 
 	elif s.id == 'while':
 		v = None
-		while toBoolean(getValue(execute(s.second, c), c)):
-			v = execute(s.block, c)
+		while toBoolean(getValue(evaluate(s.second, c), c)):
+			v = evaluate(s.block, c)
 			if v[0] == 'continue' and \
 					(not v[2] or v[2] in set(l.value for l in s.labels)):
 				pass
@@ -1695,14 +1703,14 @@ def execute(s, c):
 	elif s.id == 'for':
 		v = None
 		if hasattr(s, 'iterator'):
-			o = toObject(getValue(execute(s.object, c), c), c)
+			o = toObject(getValue(evaluate(s.object, c), c), c)
 			identifier = s.iterator
 			if identifier.id == 'var':
-				execute(identifier, c)
+				evaluate(identifier, c)
 				identifier = identifier.first[0]
 			for key in o:
-				putValue(execute(identifier, c), key, c)
-				result = execute(s.block, c)
+				putValue(evaluate(identifier, c), key, c)
+				result = evaluate(s.block, c)
 				v = result[1]
 				if result[0] == 'break' and (not result[2] or \
 						result[2] in set(l.value for l in s.labels)):
@@ -1714,14 +1722,14 @@ def execute(s, c):
 					return result
 		else:
 			if hasattr(s, 'initializer'):
-				i = execute(s.initializer, c)
+				i = evaluate(s.initializer, c)
 				if not s.initializer.id == 'var':
 					getValue(i, c)
 			while 1:
 				if hasattr(s, 'condition') and \
-						not toBoolean(getValue(execute(s.condition, c), c)):
+						not toBoolean(getValue(evaluate(s.condition, c), c)):
 					break
-				result = execute(s.block, c)
+				result = evaluate(s.block, c)
 				v = result[1]
 				if result[0] == 'break' and (not result[2] or \
 						result[2] in set(l.value for l in s.labels)):
@@ -1732,18 +1740,18 @@ def execute(s, c):
 				elif result[0] != 'normal':
 					return result
 				if hasattr(s, 'counter'):
-					getValue(execute(s.counter, c), c)
+					getValue(evaluate(s.counter, c), c)
 		return ('normal', v, None)
 	elif s.id == 'continue':
 		return ('continue', None, s.first.value if s.first else None)
 	elif s.id == 'break':
 		return ('break', None, s.first.value if s.first else None)
 	elif s.id == 'return':
-		return ('return', execute(s.first, c) if s.first else None, None)
+		return ('return', evaluate(s.first, c) if s.first else None, None)
 	elif s.id == 'with':
-		c.scope = Scope(c.scope, toObject(getValue(execute(s.first, c), c), c))
+		c.scope = Scope(c.scope, toObject(getValue(evaluate(s.first, c), c), c))
 		try:
-			r = execute(s.block, c)
+			r = evaluate(s.block, c)
 		except JavaScriptException, e:
 			r = ('throw', e.value, None)
 		c.scope = c.scope.parent
@@ -1751,18 +1759,18 @@ def execute(s, c):
 	elif s.id == 'switch':
 		pass # TODO
 	elif s.id == 'throw':
-		return ('throw', getValue(execute(s.first, c)), None)
+		return ('throw', getValue(evaluate(s.first, c)), None)
 	elif s.id == 'try':
-		result = execute(s.block, c)
+		result = evaluate(s.block, c)
 		if result[0] == 'throw' and hasattr(s, 'catchblock'):
 			c.scope = Scope(c.scope, c.global_object.object.construct([], c))
 			c.scope.object.put(s.e.value, result[1], dont_delete=True)
-			r = execute(s.catchblock, c)
+			r = evaluate(s.catchblock, c)
 			c.scope = c.scope.parent
 			if not hasattr(s, 'finallyblock') or r[0] != 'normal':
 				result = r
 		if hasattr(s, 'finallyblock'):
-			r = execute(s.finallyblock, c)
+			r = evaluate(s.finallyblock, c)
 			if not hasattr(s, 'catchblock') or r[0] != 'normal':
 				result = r
 		return result
@@ -1787,6 +1795,6 @@ def run(symbol, global_object=None):
 	c = ExecutionContext(Scope(object=global_object),
 		global_object, global_object)
 	c.instantiate_variables(symbol, global_object)
-	return execute(symbol.first, c)[1]
+	return evaluate(symbol.first, c)[1]
 
 
