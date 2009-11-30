@@ -57,6 +57,14 @@ def toInteger(value):
 		return value
 	return int(copysign(1, value) * (abs(value) // 1))
 
+def toInt32(value):
+	value = toNumber(value)
+	if isnan(value) or isinf(value) or value == 0:
+		return 0
+	value = copysign(1, value) * math.floor(abs(value))
+	value = value % 4294967296 # 2^32
+	return value if value < 2147483648 else value - 4294967296
+
 def toUint32(value):
 	value = toNumber(value)
 	if isnan(value) or isinf(value) or value == 0:
@@ -1445,13 +1453,23 @@ def execute(s, c):
 
 	## Postfix Expressions
 	elif s.id == '++':
-		if hasatter(s, 'arity'):
-			pass
-		# TODO
+		l = execute(s.first, c)
+		v = toNumber(getValue(l, c))
+		if hasattr(s, 'arity'):
+			v += 1.0
+			putValue(l, v, c)
+		else:
+			putValue(l, v + 1.0, c)
+		return v
 	elif s.id == '--':
-		if hasatter(s, 'arity'):
-			pass
-		# TODO
+		l = execute(s.first, c)
+		v = toNumber(getValue(l, c))
+		if hasattr(s, 'arity'):
+			v -= 1.0
+			putValue(l, v, c)
+		else:
+			putValue(l, v - 1.0, c)
+		return v
 
 	## Unary Operators
 	elif s.id == 'typeof':
@@ -1476,7 +1494,7 @@ def execute(s, c):
 	elif s.id == '-' and hasattr(s, 'arity'): # unary
 		return -toNumber(getValue(execute(s.first, c), c))
 	elif s.id == '~':
-		pass # TODO
+		return float(~int(toInt32(getValue(execute(s.first, c), c))))
 	elif s.id == '!':
 		return not toBoolean(getValue(execute(s.first, c), c))
 
@@ -1486,7 +1504,9 @@ def execute(s, c):
 	elif s.id == '*':
 		return toNumber(getValue(execute(s.first, c), c)) * toNumber(getValue(execute(s.second, c), c))
 	elif s.id == '%':
-		return toNumber(getValue(execute(s.first, c), c)) % toNumber(getValue(execute(s.second, c), c))
+		l = toNumber(getValue(execute(s.first, c), c))
+		r = toNumber(getValue(execute(s.second, c), c))
+		return (l % r) - (0 if l >= 0 else r)
 
 	## Additive Operators
 	elif s.id == '+':
@@ -1496,9 +1516,13 @@ def execute(s, c):
 
 	## Bitwise Shift Operators
 	elif s.id == '<<':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
+		return float(int(toInt32(l)) << int(toInt32(r) & 0x1f))
 	elif s.id == '>>':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
+		return float(int(toInt32(l)) >> int(toInt32(r) & 0x1f))
 	elif s.id == '>>>':
 		pass # TODO
 
@@ -1553,11 +1577,17 @@ def execute(s, c):
 
 	## Binary Bitwise Operators
 	elif s.id == '&':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
+		return float(int(toInt32(l)) & int(toInt32(r)))
 	elif s.id == '^':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
+		return float(int(toInt32(l)) ^ int(toInt32(r)))
 	elif s.id == '|':
-		pass # TODO
+		l = getValue(execute(s.first, c), c)
+		r = getValue(execute(s.second, c), c)
+		return float(int(toInt32(l)) | int(toInt32(r)))
 
 	## Binary Logical Operators
 	elif s.id == '&&':
