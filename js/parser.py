@@ -398,7 +398,7 @@ def nud(self):
 @method(blockstmt('switch'))
 def nud(self):
 	t = advance('(')
-	self.condition = parse(20)
+	self.condition = parse(19)
 	advance(')', t)
 	context.switch_depth += 1
 	t = advance('{')
