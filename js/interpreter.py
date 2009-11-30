@@ -143,7 +143,7 @@ def strictlyEqual(x, y):
 	if x == None or x == null:
 		return True
 	if typeof_x == 'number':
-		return not isnan(x) and not isnan(y) or x == y
+		return not isnan(x) and not isnan(y) and x == y
 	return x == y
 
 def equal(x, y):
@@ -1761,7 +1761,29 @@ def evaluate(s, c):
 		c.scope = c.scope.parent
 		return r
 	elif s.id == 'switch':
-		pass # TODO
+		v = getValue(evaluate(s.condition, c), c)
+		default = result = None
+		while not result:
+			cases = s.cases
+			if default is not None:
+				cases = cases[i:]
+				result = ('normal', None, None)
+			for i, case in enumerate(cases):
+				if case.id == 'default' and default is not None:
+					default = i
+				elif not result:
+					if strictlyEqual(getValue(evaluate(case.first, c), c), v):
+						result = ('normal', None, None)
+				if result and hasattr(case, 'block'):
+					result = evaluate(case.block, c)
+				if result and result[0] != 'normal':
+					if result[0] == 'break' and (not result[2] or \
+							result[2] in set(l.value for l in s.labels)):
+						result = ('normal', result[1], None)
+					break
+			if not result and default is None:
+				result = ('normal', None, None)
+		return result
 	elif s.id == 'throw':
 		return ('throw', getValue(evaluate(s.first, c)), None)
 	elif s.id == 'try':
