@@ -730,7 +730,29 @@ class JavaScriptArrayPrototype(JavaScriptNativePrototype):
 
 	@native(length=1)
 	def sort(this, args, c):
-		pass # TODO
+		l = toUint32(this['length'])
+		sort_function = args[0] \
+			if len(args) and hasattr(args[0], 'call') else None
+
+		def comparitor(x, y):
+			if x is None and y is None:
+				return 0
+			elif x is None:
+				return 1
+			elif y is None:
+				return -1
+			if sort_function:
+				v = sort_function.call(c.global_object, [x, y], c)
+				return int(v) if isinstance(v, float) else 0
+			else:
+				return cmp(toString(x), toString(y))
+
+		indexes = [i for i in map(str, range(int(l))) if i in this.properties]
+		els = [this[i] for i in indexes]
+		els.sort(comparitor)
+		for i, el in zip(indexes, els):
+			this[i] = el
+		return this
 
 	@native(length=2)
 	def splice(this, args, c):
