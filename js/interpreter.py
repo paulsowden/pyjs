@@ -836,11 +836,21 @@ class JavaScriptStringPrototype(JavaScriptNativePrototype):
 
 	@native(length=1)
 	def indexOf(this, args, c):
-		pass # TODO
+		this = toString(this)
+		search_string = toString(args[0] if len(args) else None)
+		position = min(max(
+			toInteger(args[1]) if len(args) > 1 else 0.0, 0.0), len(this))
+		return float(this.find(search_string, position))
 
 	@native(length=1)
 	def lastIndexOf(this, args, c):
-		pass # TODO
+		this = toString(this)
+		search_string = toString(args[0] if len(args) else None)
+		position = toNumber(args[1]) if len(args) > 1 else nan
+		position = min(max(
+			toInteger(position) if position is not nan else inf, 0.0),
+			len(this))
+		return float(this.rfind(search_string, position))
 
 	@native(length=1)
 	def localeCompare(this, args, c):
@@ -893,7 +903,13 @@ class JavaScriptStringPrototype(JavaScriptNativePrototype):
 
 	@native(length=2)
 	def substring(this, args, c):
-		pass # TODO
+		this = toString(this)
+		start = min(max(
+			toInteger(args[0] if len(args) else None), 0.0), len(this))
+		end = min(max(toInteger(args[1]) if len(args) > 1 \
+			and args[1] is not None else len(this), 0.0), len(this))
+		start, end = min(start, end), max(start, end)
+		return this[start:end]
 
 	@native
 	def toLowerCase(this, args, c):
