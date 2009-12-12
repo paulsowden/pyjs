@@ -111,14 +111,14 @@ def applyOperator(operator, l, r):
 	if operator == '/':
 		return toNumber(l) / toNumber(r)
 	if operator == '*':
-		return toNumber(l) / toNumber(r)
+		return toNumber(l) * toNumber(r)
 	if operator == '%':
 		l, r = toNumber(l), toNumber(r)
 		return (l % r) - (0 if l >= 0 else r)
 
 	## Additive Operators
 	if operator == '-':
-		return toNumber(l) / toNumber(r)
+		return toNumber(l) - toNumber(r)
 	if operator == '+':
 		l, r = toPrimitive(l), toPrimitive(r)
 		if typeof(l) == 'string' or typeof(r) == 'string':
