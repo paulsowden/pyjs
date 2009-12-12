@@ -957,7 +957,10 @@ class JavaScriptNumberPrototype(JavaScriptNativePrototype):
 
 	@native
 	def valueOf(this, args, c):
-		pass # TODO
+		if not isinstance(this, JavaScriptNumber):
+			raise JavaScriptException(
+				c.global_scope.type_error.construct([], c))
+		return this.value
 
 	@native(length=1)
 	def toFixed(this, args, c):
