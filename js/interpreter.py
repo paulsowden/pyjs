@@ -964,7 +964,7 @@ class JavaScriptNumberPrototype(JavaScriptNativePrototype):
 	def valueOf(this, args, c):
 		if not isinstance(this, JavaScriptNumber):
 			raise JavaScriptException(
-				c.global_scope.type_error.construct([], c))
+				c.global_object.type_error.construct([], c))
 		return this.value
 
 	@native(length=1)
