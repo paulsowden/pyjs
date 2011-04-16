@@ -325,12 +325,17 @@ class JavaScriptObject(object):
 		return True
 
 	def default_value(self, hint=None): # [[DefaultValue]]
-		to_string = self['toString']
-		if hasattr(to_string, 'call'):
-			return to_string.call(self, [], None)
-		value_of = self['valueOf']
-		# TODO
-		return None
+		accessors = ['toString', 'valueOf']
+		if hint == 'number' or \
+				(hint is None and not isinstance(self, JavaScriptDate)):
+			accessors.reverse()
+		for accessor in accessors:
+			to_value = self[accessor]
+			if hasattr(to_value, 'call'):
+				r = to_value.call(self, [], None) # TODO c
+				if typeof(r) != 'object':
+					return r
+		raise JavaScriptException() # TODO type error
 
 class Scope(object):
 	__slots__ = ['parent', 'object']

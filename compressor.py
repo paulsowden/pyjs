@@ -37,12 +37,8 @@ def compress(s):
 		return strchar + s.value.replace(strchar, '\\' + strchar) + strchar
 	elif s.id == '(regexp)':
 		return s.value
-	elif s.id == 'null':
-		return 'null'
-	elif s.id == 'true':
-		return 'true'
-	elif s.id == 'false':
-		return 'false'
+	elif s.id in ('null', 'true', 'false'):
+		return s.id
 
 	elif s.id == '(array)':
 		return '[%s]' % ','.join(compress(a) for a in s.first)
@@ -80,8 +76,11 @@ def compress(s):
 	elif s.id in ('~', '!'):
 		return s.id + paren(s, s.first)
 
-	## Assignment Operator
-	elif s.id in ('=', '+=', '-=', '*=', '/='):
+	## Assignment Operator, Multiplicative Operators, Additive Operators
+	## Relational Operators, Equality Operators
+	elif s.id in ('=', '+=', '-=', '*=', '/=',
+			'/', '*', '%', '+', '-', '<', '>', '<=', '>=',
+			'==', '!=', '!==', '!===', '||', '&&'):
 		return paren(s, s.first) + s.id + paren(s, s.second)
 
 	## Comma Operator
@@ -92,26 +91,12 @@ def compress(s):
 	elif s.id in ('++', '--'):
 		return paren(s, s.first) + s.id
 
-	## Multiplicative Operators
-	elif s.id in ('/', '*', '%'):
-		return paren(s, s.first) + s.id + paren(s, s.second)
-
-	## Additive Operators
-	elif s.id in ('+', '-'):
-		return paren(s, s.first) + s.id + paren(s, s.second)
-
 	## Relational Operators
-	elif s.id in ('<', '>', '<=', '>='):
-		return paren(s, s.first) + s.id + paren(s, s.second)
 	elif s.id in ('instanceof', 'in'):
 		# TODO omit space if the token on the imediate left of the
 		#      s.first if not an identifier
 		return compress(s.first) + ' ' + \
 			alphabetic_operator_righthand(s, s.second)
-
-	## Equality Operators
-	elif s.id in ('==', '!=', '!==', '!===', '||', '&&'):
-		return paren(s, s.first) + s.id + paren(s, s.second)
 
 	## Statements
 	elif s.id == '(statement)':
@@ -172,11 +157,10 @@ def compress(s):
 			' ' + compress(s.name) if s.name else '',
 			','.join(compress(param) for param in s.params),
 			block(compress(s.block)))
-	#elif s.id == 'eval':
-	#	return 'eval'
 
 	elif s.id == '?':
-		return compress(s.first) + '?' + compress(s.second) + ':' + compress(s.third)
+		return '%s?%s:%s' % (compress(s.first),
+			compress(s.second), compress(s.third))
 
 	raise RuntimeError, "unknown operation %s" % s.id
 
