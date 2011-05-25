@@ -456,9 +456,6 @@ def nud(self):
 			self.iterator = advance('(identifier)')
 		advance('in')
 		self.object = parse(20)
-		advance(')', t)
-		self.block = block()
-		return self
 	else:
 		if nexttoken.id != ';':
 			if nexttoken.id == 'var':
@@ -488,11 +485,11 @@ def nud(self):
 				comma = advance(',')
 				self.counter = symbol_table[','](
 					comma, self.counter, parse(0, 'for'))
-		advance(')', t)
-		context.iteration_depth += 1
-		self.block = block()
-		context.iteration_depth -= 1
-		return self
+	advance(')', t)
+	context.iteration_depth += 1
+	self.block = block()
+	context.iteration_depth -= 1
+	return self
 
 @method(stmt('break'))
 def nud(self):
